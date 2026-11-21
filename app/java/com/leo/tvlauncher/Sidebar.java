@@ -14,9 +14,9 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * The Roku-style left navigation bar, shared by the home screen and every
- * settings screen. Top shows the "Leo TV" brand plus a live clock/date
- * (never focusable, so the D-pad can't get trapped), then the nav items.
+ * The Roku-style left navigation bar, shared by the home screen and every settings screen. Top
+ * shows the "Leo TV" brand plus a live clock/date (never focusable, so the D-pad can't get
+ * trapped), then the nav items.
  */
 public class Sidebar {
 
@@ -45,6 +45,7 @@ public class Sidebar {
 
     public interface Listener {
         void onView(int view);
+
         void onAction(int action);
     }
 
@@ -64,15 +65,17 @@ public class Sidebar {
         if ("favorites".equals(id)) return item(id, "★", "Favorites", VIEW_FAVORITES, ACT_NONE);
         if ("recent".equals(id)) return item(id, "🕘", "Recent", VIEW_RECENT, ACT_NONE);
         if ("folders".equals(id)) return item(id, "📁", "Folders", VIEW_FOLDERS, ACT_NONE);
-        if ("notifications".equals(id)) return item(id, "🔔", "Notifications", -1, ACT_NOTIFICATIONS);
-        if ("quicksettings".equals(id)) return item(id, "⚡", "Quick settings", -1, ACT_QUICK_SETTINGS);
+        if ("notifications".equals(id))
+            return item(id, "🔔", "Notifications", -1, ACT_NOTIFICATIONS);
+        if ("quicksettings".equals(id))
+            return item(id, "⚡", "Quick settings", -1, ACT_QUICK_SETTINGS);
         if ("applock".equals(id)) return item(id, "🔒", "App Lock", -1, ACT_LOCK);
         if ("kids".equals(id)) return item(id, "🧒", "Kids mode", -1, ACT_KIDS);
         if ("settings".equals(id)) return item(id, "⚙️", "Settings", -1, ACT_SETTINGS);
         return null;
     }
 
-    /** Display name ("emoji  label") for a sidebar id, for the customize screen. */
+    /** Display name ("emoji label") for a sidebar id, for the customize screen. */
     public static String nameOf(String id) {
         Item i = defaultItem(id);
         return i == null ? id : i.emoji + "  " + i.label;
@@ -109,16 +112,21 @@ public class Sidebar {
     public void build() {
         theme = Theme.current(host);
         box.removeAllViews();
-        box.setBackgroundColor(theme.card);
+        box.setBackground(
+                new android.graphics.drawable.InsetDrawable(
+                        Glass.panel(host, theme), Theme.dp(host, 8)));
+        box.setPadding(
+                Theme.dp(host, 18), Theme.dp(host, 22), Theme.dp(host, 18), Theme.dp(host, 18));
+        box.setElevation(Theme.dp(host, 5));
         clockTime = null;
         clockDate = null;
 
         // Brand (moved here from the main-screen header).
         TextView brand = new TextView(host);
         brand.setText("Leo TV");
-        brand.setTextSize(22);
+        brand.setTextSize(18);
         brand.setTypeface(null, Typeface.BOLD);
-        brand.setTextColor(theme.accent);
+        brand.setTextColor(theme.text2);
         brand.setFocusable(false);
         int p = Theme.dp(host, 14);
         brand.setPadding(p, Theme.dp(host, 2), p, Theme.dp(host, 2));
@@ -131,8 +139,8 @@ public class Sidebar {
         clockBox.setClickable(false);
         clockBox.setPadding(p, Theme.dp(host, 4), p, Theme.dp(host, 16));
         clockTime = new TextView(host);
-        clockTime.setTextSize(24);
-        clockTime.setTypeface(null, Typeface.BOLD);
+        clockTime.setTextSize(30);
+        clockTime.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
         clockTime.setTextColor(theme.text);
         clockTime.setFocusable(false);
         clockDate = new TextView(host);
@@ -147,21 +155,23 @@ public class Sidebar {
         // Scrollable item list: on small screens the items can overflow,
         // and the ScrollView follows D-pad focus automatically.
         ScrollView scroller = new ScrollView(host);
-        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
+        LinearLayout.LayoutParams slp =
+                new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
         scroller.setLayoutParams(slp);
         scroller.setFillViewport(true);
         scroller.setVerticalScrollBarEnabled(false);
         itemBox = new LinearLayout(host);
         itemBox.setOrientation(LinearLayout.VERTICAL);
-        itemBox.setLayoutParams(new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT));
+        itemBox.setLayoutParams(
+                new FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.WRAP_CONTENT));
         scroller.addView(itemBox);
         box.addView(scroller);
 
         if (HomePrefs.kidsMode(host)) {
-            addItem(item("exitkids", "🚪", "Exit kids mode", -1, ACT_EXIT_KIDS),
+            addItem(
+                    item("exitkids", "🚪", "Exit kids mode", -1, ACT_EXIT_KIDS),
                     "exitkids".equals(selectedId));
         } else {
             Set<String> hidden = HomePrefs.sidebarHidden(host);
@@ -175,27 +185,69 @@ public class Sidebar {
 
     private void addItem(final Item s, boolean selected) {
         final TextView tv = new TextView(host);
-        tv.setText(s.emoji + "  " + s.label);
-        tv.setTextSize(19);
-        int pad = Theme.dp(host, 14);
+        tv.setText(s.label);
+        tv.setContentDescription(s.label);
+        int symbol =
+                "home".equals(s.id)
+                        ? LeoIcon.HOME
+                        : "favorites".equals(s.id)
+                                ? LeoIcon.STAR
+                                : "recent".equals(s.id)
+                                        ? LeoIcon.CLOCK
+                                        : "folders".equals(s.id)
+                                                ? LeoIcon.FOLDER
+                                                : "notifications".equals(s.id)
+                                                        ? LeoIcon.BELL
+                                                        : "applock".equals(s.id)
+                                                                ? LeoIcon.LOCK
+                                                                : "kids".equals(s.id)
+                                                                        ? LeoIcon.PERSON
+                                                                        : "exitkids".equals(s.id)
+                                                                                ? LeoIcon.POWER
+                                                                                : LeoIcon.SETTINGS;
+        LeoIcon icon = new LeoIcon(symbol, selected ? theme.accent : theme.text2);
+        int iconSize = Theme.dp(host, 18);
+        icon.setBounds(0, 0, iconSize, iconSize);
+        tv.setCompoundDrawablesRelative(icon, null, null, null);
+        tv.setCompoundDrawablePadding(Theme.dp(host, 10));
+        tv.setTextSize(17);
+        int pad = Theme.dp(host, 10);
         tv.setPadding(pad, pad, pad, pad);
         tv.setFocusable(true);
         tv.setFocusableInTouchMode(true);
         tv.setClickable(true);
         tv.setTag("side:" + s.id);
-        tv.setBackground(Theme.tileBackground(host, theme));
+        android.graphics.drawable.StateListDrawable state =
+                new android.graphics.drawable.StateListDrawable();
+        state.addState(
+                new int[] {android.R.attr.state_focused},
+                Theme.surface(host, Glass.light(theme) ? 0xEAF9FAFC : 0xE0404754, theme.accent, 1));
+        state.addState(
+                new int[] {android.R.attr.state_pressed},
+                Theme.surface(host, theme.cardFocus, 0, 0));
+        state.addState(
+                new int[] {},
+                Theme.surface(
+                        host,
+                        selected ? (Glass.light(theme) ? 0x608B9BAD : 0x387F91B0) : 0x00000000,
+                        0,
+                        0));
+        tv.setBackground(state);
         tv.setTextColor(selected ? theme.accent : theme.text);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
+        LinearLayout.LayoutParams lp =
+                new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.setMargins(0, 0, 0, Theme.dp(host, 8));
         tv.setLayoutParams(lp);
-        tv.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                if (s.view >= 0) listener.onView(s.view);
-                else listener.onAction(s.action);
-            }
-        });
+        tv.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        if (s.view >= 0) listener.onView(s.view);
+                        else listener.onAction(s.action);
+                    }
+                });
         itemBox.addView(tv);
     }
 
@@ -218,8 +270,7 @@ public class Sidebar {
             clockTime.setText(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(now));
         }
         if (clockDate != null) {
-            clockDate.setText(
-                    new SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(now));
+            clockDate.setText(new SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(now));
         }
     }
 }

@@ -131,7 +131,7 @@ public class SettingsActivity extends BaseSidebarActivity {
         } else if ("Layout & apps".equals(category)) {
             addSummary(
                     "Layout density",
-                    Theme.iconSizeDp(this) + " dp icon fallback · cards scale together",
+                    Theme.iconSizeDp(this) + " dp icon limit · smaller cards at smaller settings",
                     "choosesize");
             addSummary(
                     "App title size",
@@ -156,6 +156,10 @@ public class SettingsActivity extends BaseSidebarActivity {
                     minutes == 0 ? "Always ask for PIN" : "After " + minutes + " minutes",
                     "chooserelock");
         } else if ("System".equals(category)) {
+            addSummary(
+                    "Visual build",
+                    "Glass home preview 1 · smaller 24 / 32 dp options",
+                    "visualbuild");
             addSummary(
                     "Default Home app",
                     isDefaultHome()
@@ -358,9 +362,15 @@ public class SettingsActivity extends BaseSidebarActivity {
                     "Layout density",
                     "iconsize",
                     new String[] {
-                        "Extra compact", "Compact", "Comfortable", "Large", "Extra large"
+                        "Tiny · 24 dp",
+                        "Very compact · 32 dp",
+                        "Extra compact · 40 dp",
+                        "Compact · 56 dp",
+                        "Comfortable · 72 dp",
+                        "Large · 88 dp",
+                        "Extra large · 104 dp"
                     },
-                    new String[] {"40", "56", "72", "88", "104"},
+                    new String[] {"24", "32", "40", "56", "72", "88", "104"},
                     String.valueOf(Theme.iconSizeDp(this)));
             return;
         }
@@ -406,6 +416,19 @@ public class SettingsActivity extends BaseSidebarActivity {
         if ("reducemotion".equals(r.kind)) {
             Theme.setReducedMotion(this, !Theme.reducedMotion(this));
             buildRows();
+            return;
+        }
+        if ("visualbuild".equals(r.kind)) {
+            Theme.dialog(this)
+                    .setTitle("Glass home preview 1")
+                    .setMessage(
+                            "Native Android Views with layered translucent surfaces, single-surface"
+                                + " app cards and smaller density options. Home glass is a tinted"
+                                + " approximation, not live backdrop blur. Supported Android 12+"
+                                + " dialogs may blur the window behind them. TV visual and remote"
+                                + " testing is still required.")
+                    .setPositiveButton("OK", null)
+                    .show();
             return;
         }
         if ("sethome".equals(r.kind)) {
@@ -727,7 +750,7 @@ public class SettingsActivity extends BaseSidebarActivity {
             } catch (ActivityNotFoundException noDefaultSettings) {
                 toast(
                         "Open TV Settings > Apps > Default apps > Home app. Some TVs do not allow"
-                            + " changing the Home app.");
+                                + " changing the Home app.");
             }
         }
     }

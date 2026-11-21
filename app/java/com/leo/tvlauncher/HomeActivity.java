@@ -30,9 +30,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Lean, D-pad friendly TV home screen with a Roku-style left navigation bar.
- * Plain GridLayout (no GridView): every tile is a real focused view, so the
- * remote's D-pad and OK button always work. Long-press a tile to organize.
+ * Lean, D-pad friendly TV home screen with a Roku-style left navigation bar. Plain GridLayout (no
+ * GridView): every tile is a real focused view, so the remote's D-pad and OK button always work.
+ * Long-press a tile to organize.
  */
 public class HomeActivity extends Activity {
 
@@ -64,12 +64,14 @@ public class HomeActivity extends Activity {
     private final Map<String, AppEntry> catalog = new HashMap<>();
     private String lastFocusedTag;
 
-    private final Runnable clockTick = new Runnable() {
-        @Override public void run() {
-            if (sidebar != null) sidebar.tick();
-            clockHandler.postDelayed(this, 30000);
-        }
-    };
+    private final Runnable clockTick =
+            new Runnable() {
+                @Override
+                public void run() {
+                    if (sidebar != null) sidebar.tick();
+                    clockHandler.postDelayed(this, 30000);
+                }
+            };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -135,13 +137,15 @@ public class HomeActivity extends Activity {
         reload();
         clockTick.run();
         // Focus the first tile so the D-pad works immediately.
-        grid.post(new Runnable() {
-            @Override public void run() {
-                if (grid.getChildCount() > 0 && getCurrentFocus() == null) {
-                    grid.getChildAt(0).requestFocus();
-                }
-            }
-        });
+        grid.post(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        if (grid.getChildCount() > 0 && getCurrentFocus() == null) {
+                            grid.getChildAt(0).requestFocus();
+                        }
+                    }
+                });
     }
 
     private void reload() {
@@ -149,31 +153,59 @@ public class HomeActivity extends Activity {
         if (oldFocus != null && oldFocus.getTag() instanceof String)
             lastFocusedTag = (String) oldFocus.getTag();
         theme = Theme.current(this);
-        root.setBackgroundColor(theme.bg);
+        root.setBackground(Glass.wallpaper(theme));
         boolean kids = HomePrefs.kidsMode(this);
         recentHeader.setTextColor(theme.text2);
+        recentHeader.setText("RECENT");
+        recentHeader.setTextSize(13);
+        recentHeader.setLetterSpacing(.12f);
+        recentScroller.setBackground(Glass.panel(this, theme));
+        recentScroller.setElevation(Theme.dp(this, 6));
+        recentScroller.setPadding(
+                Theme.dp(this, 10), Theme.dp(this, 6), Theme.dp(this, 10), Theme.dp(this, 2));
         hintView.setTextColor(theme.text2);
         emptyView.setTextColor(theme.text2);
-        hintView.setText(movingPkg != null ? "D-pad to move  •  OK to place  •  Back to cancel"
-                : (kids ? "PIN required to exit kids mode"
-                : "◀ Menu  •  D-pad to move  •  OK to open  •  Hold OK to organize"));
+        hintView.setText(
+                movingPkg != null
+                        ? "D-pad to move  •  OK to place  •  Back to cancel"
+                        : (kids
+                                ? "PIN required to exit kids mode"
+                                : "◀ Menu  •  D-pad to move  •  OK to open  •  Hold OK to"
+                                        + " organize"));
         catalog.clear();
         for (AppEntry e : Apps.query(this)) catalog.put(e.pkg, e);
         applyWallpaper();
         View scrim = findViewById(R.id.wallpaper_scrim);
         scrim.setVisibility(
                 wallpaperView.getVisibility() == View.VISIBLE ? View.VISIBLE : View.GONE);
-        scrim.setBackground(
+        int rgb = theme.bg & 0x00FFFFFF;
+        android.graphics.drawable.GradientDrawable sideShade =
+                new android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                        new int[] {rgb | 0xA0000000, rgb | 0x40000000});
+        android.graphics.drawable.GradientDrawable lowerShade =
                 new android.graphics.drawable.GradientDrawable(
                         android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-                        new int[] {
-                            Theme.current(this).bg & 0xCCFFFFFF, Theme.current(this).bg | 0xF0000000
-                        }));
-        sidebar = new Sidebar(this, sidebarBox, Sidebar.idForView(currentView),
-                new Sidebar.Listener() {
-                    @Override public void onView(int view) { onSidebarView(view); }
-                    @Override public void onAction(int action) { handleAction(action); }
-                });
+                        new int[] {rgb | 0x30000000, rgb | 0x80000000});
+        scrim.setBackground(
+                new android.graphics.drawable.LayerDrawable(
+                        new android.graphics.drawable.Drawable[] {sideShade, lowerShade}));
+        sidebar =
+                new Sidebar(
+                        this,
+                        sidebarBox,
+                        Sidebar.idForView(currentView),
+                        new Sidebar.Listener() {
+                            @Override
+                            public void onView(int view) {
+                                onSidebarView(view);
+                            }
+
+                            @Override
+                            public void onAction(int action) {
+                                handleAction(action);
+                            }
+                        });
         sidebar.build();
         buildGrid();
         buildRecentRow();
@@ -228,11 +260,13 @@ public class HomeActivity extends Activity {
         long now = System.currentTimeMillis();
         if (now - lastHomePress < 800 && !favTileIndices.isEmpty()) {
             final int idx = favTileIndices.get(0);
-            grid.post(new Runnable() {
-                @Override public void run() {
-                    if (idx < grid.getChildCount()) grid.getChildAt(idx).requestFocus();
-                }
-            });
+            grid.post(
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            if (idx < grid.getChildCount()) grid.getChildAt(idx).requestFocus();
+                        }
+                    });
         }
         lastHomePress = now;
     }
@@ -391,8 +425,10 @@ public class HomeActivity extends Activity {
             List<String> order = HomePrefs.getList(this, "app_order");
             boolean orderChanged = false;
             for (AppEntry e : sortedCatalog()) {
-                if (!hidden.contains(e.pkg) && FolderStore.folderOf(this, e.pkg) == null
-                        && !favOrder.contains(e.pkg) && !order.contains(e.pkg)) {
+                if (!hidden.contains(e.pkg)
+                        && FolderStore.folderOf(this, e.pkg) == null
+                        && !favOrder.contains(e.pkg)
+                        && !order.contains(e.pkg)) {
                     order.add(e.pkg);
                     orderChanged = true;
                 }
@@ -400,13 +436,22 @@ public class HomeActivity extends Activity {
             if (orderChanged) HomePrefs.setList(this, "app_order", order);
             for (String pkg : order) {
                 AppEntry e = byPkg.get(pkg);
-                if (e != null && !hidden.contains(pkg)
-                        && FolderStore.folderOf(this, pkg) == null && !favOrder.contains(pkg)) {
+                if (e != null
+                        && !hidden.contains(pkg)
+                        && FolderStore.folderOf(this, pkg) == null
+                        && !favOrder.contains(pkg)) {
                     tiles.add(e);
                 }
             }
         }
 
+        gridCols =
+                TileMetrics.homeColumns(
+                        AppTiles.available(grid),
+                        getResources().getDisplayMetrics().density,
+                        Theme.iconSizeDp(this),
+                        tiles.size());
+        grid.setColumnCount(gridCols);
         for (AppEntry e : tiles) grid.addView(makeTile(e));
         if (restoreTag != null && (focused == null || !restoreTag.startsWith("side:")))
             focusTile(restoreTag);
@@ -420,13 +465,15 @@ public class HomeActivity extends Activity {
                                         ? "Recent"
                                         : currentView == Sidebar.VIEW_FOLDERS ? "Folders" : "Home");
         title.setTextColor(theme.text);
+        title.setTextSize(32);
+        title.setTypeface(android.graphics.Typeface.create("sans-serif-medium", 0));
 
         if (tiles.isEmpty()) {
             emptyView.setVisibility(View.VISIBLE);
             if (kids) {
                 emptyView.setText(
                         "No apps allowed yet.\n"
-                            + "Exit kids mode → Settings → Kids mode to choose apps.");
+                                + "Exit kids mode → Settings → Kids mode to choose apps.");
             } else if (currentView == Sidebar.VIEW_FAVORITES) {
                 emptyView.setText("No favorites yet.\nHold OK on an app → ☆ Add to favorites");
             } else if (currentView == Sidebar.VIEW_RECENT) {
@@ -511,7 +558,7 @@ public class HomeActivity extends Activity {
     }
 
     private View makeRecentTile(final AppEntry e) {
-        int width = Theme.dp(this, 176);
+        int width = Theme.dp(this, 136);
         View v = AppTiles.create(this, e, width, catalog);
         v.setTag("recent:" + e.pkg);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(width, -2);
@@ -543,16 +590,22 @@ public class HomeActivity extends Activity {
 
     private void enterKidsMode() {
         if (!PinStore.hasPin(this)) {
-            Toast.makeText(this, "Set a PIN first — it's needed to exit kids mode",
-                    Toast.LENGTH_LONG).show();
+            Toast.makeText(
+                            this,
+                            "Set a PIN first — it's needed to exit kids mode",
+                            Toast.LENGTH_LONG)
+                    .show();
             Intent i = new Intent(this, PinActivity.class);
             i.putExtra("mode", PinActivity.MODE_SET);
             startActivity(i);
             return;
         }
         if (HomePrefs.kidsApps(this).isEmpty()) {
-            Toast.makeText(this, "Choose kids apps first: sidebar → Settings → Kids mode",
-                    Toast.LENGTH_LONG).show();
+            Toast.makeText(
+                            this,
+                            "Choose kids apps first: sidebar → Settings → Kids mode",
+                            Toast.LENGTH_LONG)
+                    .show();
             startActivity(new Intent(this, SettingsActivity.class));
             return;
         }
@@ -575,8 +628,7 @@ public class HomeActivity extends Activity {
 
     private void showAppOrganizeMenu(final AppEntry e, boolean allowMove) {
         final boolean fav = HomePrefs.isFav(this, e.pkg);
-        final boolean locked = PinStore.hasPin(this)
-                && PinStore.lockedApps(this).contains(e.pkg);
+        final boolean locked = PinStore.hasPin(this) && PinStore.lockedApps(this).contains(e.pkg);
         final boolean hasFolders = !FolderStore.getFolders(this).isEmpty();
         List<String> items = new ArrayList<>();
         if (allowMove) items.add("Move app");
@@ -615,12 +667,17 @@ public class HomeActivity extends Activity {
             HomePrefs.setFav(this, e.pkg, !HomePrefs.isFav(this, e.pkg));
             buildGrid();
             focusTile(tileTag(e));
-            Toast.makeText(this, HomePrefs.isFav(this, e.pkg)
-                    ? "Added to favorites" : "Removed from favorites", Toast.LENGTH_SHORT).show();
+            Toast.makeText(
+                            this,
+                            HomePrefs.isFav(this, e.pkg)
+                                    ? "Added to favorites"
+                                    : "Removed from favorites",
+                            Toast.LENGTH_SHORT)
+                    .show();
         } else if (item.startsWith("🔒") || item.startsWith("🔓")) {
             if (!PinStore.hasPin(this)) {
-                Toast.makeText(this, "Set a PIN first (sidebar → App Lock)",
-                        Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Set a PIN first (sidebar → App Lock)", Toast.LENGTH_LONG)
+                        .show();
                 Intent i = new Intent(this, PinActivity.class);
                 i.putExtra("mode", PinActivity.MODE_SET);
                 startActivity(i);
@@ -629,8 +686,11 @@ public class HomeActivity extends Activity {
                 PinStore.setLocked(this, e.pkg, nowLocked);
                 buildGrid();
                 focusTile(tileTag(e));
-                Toast.makeText(this, nowLocked ? e.label + " locked" : e.label + " unlocked",
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(
+                                this,
+                                nowLocked ? e.label + " locked" : e.label + " unlocked",
+                                Toast.LENGTH_SHORT)
+                        .show();
             }
         } else if (item.equals("Create folder with this app")) {
             promptNewFolder(e);
@@ -653,8 +713,10 @@ public class HomeActivity extends Activity {
             Toast.makeText(this, e.label + " hidden", Toast.LENGTH_SHORT).show();
         } else if (item.equals("App info")) {
             try {
-                Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                        Uri.parse("package:" + e.pkg));
+                Intent i =
+                        new Intent(
+                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                Uri.parse("package:" + e.pkg));
                 startActivity(i);
             } catch (ActivityNotFoundException ex) {
                 Toast.makeText(this, "App info not available", Toast.LENGTH_SHORT).show();
@@ -663,12 +725,17 @@ public class HomeActivity extends Activity {
     }
 
     private void uninstallApp(AppEntry e) {
-        Apps.uninstall(this, e.pkg, e.label, new Runnable() {
-            @Override public void run() {
-                buildGrid();
-                buildRecentRow();
-            }
-        });
+        Apps.uninstall(
+                this,
+                e.pkg,
+                e.label,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        buildGrid();
+                        buildRecentRow();
+                    }
+                });
     }
 
     private void promptRenameApp(final AppEntry e) {
@@ -858,15 +925,17 @@ public class HomeActivity extends Activity {
     }
 
     private void focusTile(final String tag) {
-        grid.post(new Runnable() {
-            @Override public void run() {
-                for (int i = 0; i < grid.getChildCount(); i++) {
-                    if (tag.equals(grid.getChildAt(i).getTag())) {
-                        grid.getChildAt(i).requestFocus();
-                        return;
+        grid.post(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        for (int i = 0; i < grid.getChildCount(); i++) {
+                            if (tag.equals(grid.getChildAt(i).getTag())) {
+                                grid.getChildAt(i).requestFocus();
+                                return;
+                            }
+                        }
                     }
-                }
-            }
-        });
+                });
     }
 }

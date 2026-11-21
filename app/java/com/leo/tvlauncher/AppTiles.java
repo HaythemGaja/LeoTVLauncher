@@ -44,23 +44,32 @@ public final class AppTiles {
         Theme t = Theme.current(c);
         LinearLayout tile = new LinearLayout(c);
         tile.setOrientation(LinearLayout.VERTICAL);
-        tile.setPadding(Theme.dp(c, 6), Theme.dp(c, 6), Theme.dp(c, 6), Theme.dp(c, 8));
+        tile.setClipChildren(false);
+        tile.setClipToPadding(false);
+        // The art is the only card surface. The label sits directly on the canvas.
+        tile.setPadding(0, 0, 0, Theme.dp(c, 4));
         tile.setFocusable(true);
         tile.setFocusableInTouchMode(true);
         tile.setClickable(true);
-        tile.setBackground(Theme.tileBackground(c, t));
-        Theme.focusMotion(tile, 1.035f);
-        int artWidth = Math.max(1, width - Theme.dp(c, 12));
+        Theme.focusMotion(tile, 1.025f);
+        int artWidth = Math.max(1, width);
         FrameLayout artwork = new FrameLayout(c);
         LinearLayout.LayoutParams artLp =
                 new LinearLayout.LayoutParams(-1, Math.max(1, artWidth * 9 / 16));
         artwork.setLayoutParams(artLp);
-        GradientDrawable bg =
-                new GradientDrawable(
-                        GradientDrawable.Orientation.TL_BR, new int[] {t.cardFocus, t.card});
-        bg.setCornerRadius(Theme.dp(c, 12));
-        artwork.setBackground(bg);
+        GradientDrawable bg = Theme.surface(c, t.card, 0, 0);
+        artwork.setBackground(entry.banner == null ? Glass.panel(c, t) : bg);
+        artwork.setElevation(Theme.dp(c, 3));
         artwork.setClipToOutline(true);
+        artwork.setDuplicateParentStateEnabled(true);
+        android.graphics.drawable.StateListDrawable outline =
+                new android.graphics.drawable.StateListDrawable();
+        outline.addState(
+                new int[] {android.R.attr.state_focused}, Theme.surface(c, 0, t.accent, 1));
+        outline.addState(
+                new int[] {android.R.attr.state_pressed}, Theme.surface(c, 0x18000000, 0, 0));
+        outline.addState(new int[] {}, Theme.surface(c, 0, 0, 0));
+        artwork.setForeground(outline);
         tile.addView(artwork);
         if (entry.folderId != null) {
             bindFolder(c, artwork, entry, catalog, t);
@@ -89,22 +98,29 @@ public final class AppTiles {
                 entry.folderId != null
                         ? folderLocked(c, entry.folderId)
                         : PinStore.hasPin(c) && PinStore.lockedApps(c).contains(entry.pkg);
-        if (locked) addBadge(c, badges, new LeoIcon(LeoIcon.LOCK, t.accent));
-        if (entry.favorite) addBadge(c, badges, new LeoIcon(LeoIcon.STAR, t.accent));
+        if (locked) addBadge(c, badges, new LeoIcon(LeoIcon.LOCK, t.text2));
+        if (entry.favorite) addBadge(c, badges, new LeoIcon(LeoIcon.STAR, t.text2));
         FrameLayout.LayoutParams badgesLp =
                 new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
         badgesLp.setMargins(0, Theme.dp(c, 7), Theme.dp(c, 7), 0);
         artwork.addView(badges, badgesLp);
         TextView label = new TextView(c);
         label.setText(entry.folderId != null ? entry.label : HomePrefs.displayLabel(c, entry));
+        if (entry.folderId != null) {
+            LeoIcon folderMark = new LeoIcon(LeoIcon.FOLDER, t.text2);
+            int mark = Theme.dp(c, 16);
+            folderMark.setBounds(0, 0, mark, mark);
+            label.setCompoundDrawablesRelative(folderMark, null, null, null);
+            label.setCompoundDrawablePadding(Theme.dp(c, 6));
+        }
         label.setTextColor(t.text);
         label.setTextSize(Theme.labelSizeSp(c));
         label.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         label.setMaxLines(2);
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        label.setPadding(Theme.dp(c, 5), Theme.dp(c, 10), Theme.dp(c, 5), 0);
+        label.setPadding(Theme.dp(c, 2), Theme.dp(c, 8), Theme.dp(c, 2), 0);
         // Reserve two scaled text lines so larger labels do not collide with the next row.
-        label.setMinHeight((int) Math.ceil(label.getTextSize() * 2.5f) + Theme.dp(c, 10));
+        label.setMinHeight((int) Math.ceil(label.getTextSize() * 2.35f) + Theme.dp(c, 8));
         label.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         tile.addView(label, new LinearLayout.LayoutParams(-1, -2));
         tile.setContentDescription(
@@ -123,14 +139,14 @@ public final class AppTiles {
     private static void addBadge(Context c, LinearLayout badges, Drawable icon) {
         ImageView v = new ImageView(c);
         v.setImageDrawable(icon);
-        int p = Theme.dp(c, 5);
+        int p = Theme.dp(c, 3);
         v.setPadding(p, p, p, p);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xE6101820);
+        bg.setColor(0xD9101418);
         bg.setCornerRadius(Theme.dp(c, 7));
         v.setBackground(bg);
         LinearLayout.LayoutParams lp =
-                new LinearLayout.LayoutParams(Theme.dp(c, 28), Theme.dp(c, 28));
+                new LinearLayout.LayoutParams(Theme.dp(c, 22), Theme.dp(c, 22));
         lp.setMarginStart(Theme.dp(c, 4));
         badges.addView(v, lp);
     }
@@ -138,29 +154,46 @@ public final class AppTiles {
     private static void bindFolder(
             Context c, FrameLayout art, AppEntry e, Map<String, AppEntry> catalog, Theme t) {
         FolderStore.Folder folder = FolderStore.get(c, e.folderId);
-        LinearLayout rows = new LinearLayout(c);
-        rows.setOrientation(LinearLayout.VERTICAL);
-        int p = Theme.dp(c, 9);
-        rows.setPadding(p, p, p, p);
-        art.addView(rows, new FrameLayout.LayoutParams(-1, -1));
+        java.util.List<AppEntry> preview = new java.util.ArrayList<>();
+        if (folder != null) {
+            for (String pkg : folder.apps) {
+                AppEntry app = catalog.get(pkg);
+                if (app != null && preview.size() < 4) preview.add(app);
+            }
+        }
+        // One matte cover; square logos keep a mixed folder visually consistent.
+        LinearLayout mosaic = new LinearLayout(c);
+        mosaic.setOrientation(LinearLayout.VERTICAL);
+        int inset = Theme.dp(c, 8);
+        mosaic.setPadding(inset, inset, inset, inset);
+        FrameLayout.LayoutParams coverLp = new FrameLayout.LayoutParams(-1, -1);
+        art.addView(mosaic, coverLp);
         int index = 0;
         for (int y = 0; y < 2; y++) {
             LinearLayout row = new LinearLayout(c);
-            rows.addView(row, new LinearLayout.LayoutParams(-1, 0, 1));
+            mosaic.addView(row, new LinearLayout.LayoutParams(-1, 0, 1));
             for (int x = 0; x < 2; x++) {
-                AppEntry app = null;
-                while (folder != null && index < folder.apps.size() && app == null)
-                    app = catalog.get(folder.apps.get(index++));
-                ImageView image = new ImageView(c);
-                image.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                int pad = Theme.dp(c, 4);
-                image.setPadding(pad, pad, pad, pad);
-                if (app != null) image.setImageDrawable(app.banner != null ? app.banner : app.icon);
-                else image.setImageDrawable(new LeoIcon(LeoIcon.FOLDER, t.text2));
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, 1);
-                lp.setMargins(pad, pad, pad, pad);
-                row.addView(image, lp);
+                FrameLayout cell = new FrameLayout(c);
+                row.addView(cell, new LinearLayout.LayoutParams(0, -1, 1));
+                if (index < preview.size()) {
+                    AppEntry app = preview.get(index++);
+                    ImageView logo = new ImageView(c);
+                    logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    logo.setImageDrawable(app.icon);
+                    // Fit within each cell even at the smallest card setting.
+                    FrameLayout.LayoutParams logoLp = new FrameLayout.LayoutParams(-1, -1);
+                    logoLp.setMargins(
+                            Theme.dp(c, 4), Theme.dp(c, 2), Theme.dp(c, 4), Theme.dp(c, 2));
+                    cell.addView(logo, logoLp);
+                }
             }
+        }
+        if (preview.isEmpty()) {
+            ImageView folderIcon = new ImageView(c);
+            folderIcon.setImageDrawable(new LeoIcon(LeoIcon.FOLDER, t.text2));
+            art.addView(
+                    folderIcon,
+                    new FrameLayout.LayoutParams(Theme.dp(c, 28), Theme.dp(c, 28), Gravity.CENTER));
         }
     }
 }
