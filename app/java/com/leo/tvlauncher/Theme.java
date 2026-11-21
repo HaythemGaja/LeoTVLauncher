@@ -50,37 +50,37 @@ public class Theme {
         new Theme(
                 "midnight",
                 "Midnight",
-                0xFF101418,
-                0xFF1C2126,
-                0xFF2A3138,
-                0xFFFFC168,
+                0xFF13161D,
+                0xE02A2E38,
+                0xE03B414D,
+                0xFFBED0F1,
                 0xFFFFFFFF,
                 0xFFB0BEC5),
         new Theme(
                 "ocean",
                 "Ocean",
-                0xFF0A1628,
-                0xFF12233D,
-                0xFF1B3355,
-                0xFF4FC3F7,
+                0xFF13161D,
+                0xE02A2E38,
+                0xE03B414D,
+                0xFFA5C9EA,
                 0xFFFFFFFF,
                 0xFF90A4AE),
         new Theme(
                 "forest",
                 "Forest",
-                0xFF0C1A12,
-                0xFF14261B,
-                0xFF1E3A28,
-                0xFF81C784,
+                0xFF13161D,
+                0xE02A2E38,
+                0xE03B414D,
+                0xFFAACBB7,
                 0xFFFFFFFF,
                 0xFFA5BFA8),
         new Theme(
                 "crimson",
                 "Crimson",
-                0xFF1A0E0E,
-                0xFF2A1515,
-                0xFF3D1F1F,
-                0xFFFF5252,
+                0xFF13161D,
+                0xE02A2E38,
+                0xE03B414D,
+                0xFFE1B4BF,
                 0xFFFFFFFF,
                 0xFFC9A9A9),
         new Theme(
@@ -157,10 +157,9 @@ public class Theme {
     public static StateListDrawable tileBackground(Context c, Theme t) {
         StateListDrawable states = new StateListDrawable();
         states.addState(new int[] {-android.R.attr.state_enabled}, surface(c, t.card, 0, 0));
+        states.addState(new int[] {android.R.attr.state_pressed}, surface(c, t.cardFocus, 0, 0));
         states.addState(
-                new int[] {android.R.attr.state_pressed}, surface(c, t.cardFocus, t.accent, 3));
-        states.addState(
-                new int[] {android.R.attr.state_focused}, surface(c, t.cardFocus, t.accent, 2));
+                new int[] {android.R.attr.state_focused}, surface(c, t.cardFocus, t.accent, 1));
         states.addState(new int[] {android.R.attr.state_selected}, surface(c, t.cardFocus, 0, 0));
         states.addState(new int[] {}, surface(c, t.card, 0, 0));
         return states;
@@ -169,14 +168,14 @@ public class Theme {
     public static GradientDrawable surface(Context c, int fill, int stroke, int width) {
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(fill);
-        bg.setCornerRadius(dp(c, 14));
+        bg.setCornerRadius(dp(c, 22));
         if (width > 0) bg.setStroke(dp(c, width), stroke);
         return bg;
     }
 
     /** Always visible while moving, not confused with the focus outline. */
     public static StateListDrawable movingTileBackground(Context c, Theme t) {
-        GradientDrawable bg = surface(c, t.cardFocus, t.accent, 2);
+        GradientDrawable bg = surface(c, t.cardFocus, t.accent, 1);
         bg.setStroke(dp(c, 2), t.accent, dp(c, 7), dp(c, 4));
         StateListDrawable states = new StateListDrawable();
         states.addState(new int[] {}, bg);
@@ -222,7 +221,7 @@ public class Theme {
         Theme t = current(a);
         View root = ((ViewGroup) a.findViewById(android.R.id.content)).getChildAt(0);
         if (root != null) {
-            root.setBackgroundColor(t.bg);
+            root.setBackground(Glass.wallpaper(t));
             View content = a.findViewById(R.id.sidebar_content);
             if (content instanceof ViewGroup && ((ViewGroup) content).getChildCount() > 0)
                 ((ViewGroup) content).getChildAt(0).setBackgroundColor(t.bg);
@@ -259,7 +258,14 @@ public class Theme {
     /** Match the palette of all utility dialogs without changing their actions. */
     public static android.app.AlertDialog.Builder dialog(Context c) {
         return new android.app.AlertDialog.Builder(
-                c, "light".equals(current(c).id) ? R.style.LeoDialogLight : R.style.LeoDialog);
+                c, "light".equals(current(c).id) ? R.style.LeoDialogLight : R.style.LeoDialog) {
+            @Override
+            public android.app.AlertDialog create() {
+                android.app.AlertDialog dialog = super.create();
+                dialog.setOnShowListener(ignored -> Glass.dialogShown(dialog, c));
+                return dialog;
+            }
+        };
     }
 
     /** Clip an app icon to the chosen shape. */

@@ -16,7 +16,10 @@ public final class LeoIcon extends Drawable {
             CLOCK = 8,
             INFO = 9,
             POWER = 10,
-            RESTART = 11;
+            RESTART = 11,
+            HOME = 12,
+            BELL = 13,
+            PERSON = 14;
     private final int kind;
     private final Paint paint = new Paint(3);
     private int color;
@@ -36,7 +39,35 @@ public final class LeoIcon extends Drawable {
         paint.setStrokeWidth(1.7f);
         paint.setStrokeJoin(Paint.Join.ROUND);
         paint.setStrokeCap(Paint.Cap.ROUND);
-        if (kind == LOCK) {
+        if (kind == HOME) {
+            Path p = new Path();
+            p.moveTo(3, 11);
+            p.lineTo(12, 3);
+            p.lineTo(21, 11);
+            p.moveTo(5, 10);
+            p.lineTo(5, 21);
+            p.lineTo(10, 21);
+            p.lineTo(10, 15);
+            p.lineTo(14, 15);
+            p.lineTo(14, 21);
+            p.lineTo(19, 21);
+            p.lineTo(19, 10);
+            canvas.drawPath(p, paint);
+        } else if (kind == BELL) {
+            Path p = new Path();
+            p.moveTo(4, 18);
+            p.lineTo(6, 15);
+            p.lineTo(6, 9);
+            p.cubicTo(6, 1, 18, 1, 18, 9);
+            p.lineTo(18, 15);
+            p.lineTo(20, 18);
+            p.close();
+            canvas.drawPath(p, paint);
+            canvas.drawArc(9, 18, 15, 23, 0, 180, false, paint);
+        } else if (kind == PERSON) {
+            canvas.drawCircle(12, 7, 4, paint);
+            canvas.drawArc(4, 13, 20, 27, 180, 180, false, paint);
+        } else if (kind == LOCK) {
             canvas.drawRoundRect(5, 10, 19, 22, 3, 3, paint);
             canvas.drawArc(8, 2, 16, 15, 180, 180, false, paint);
             canvas.drawLine(12, 15, 12, 18, paint);
