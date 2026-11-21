@@ -1,0 +1,66 @@
+# LeoTVLauncher — build notes
+
+- Package: `com.leo.tvlauncher`, minSdk 24, targetSdk 34.
+- Signed with the shared Android debug keystore (`../debug.keystore`) so updates install over previous versions — keep the key.
+- Build: `~/workspace/android-build/tvlauncher/build-apk.sh` (aapt2 → javac → d8 → apksigner v1+v2+v3 → zipalign).
+- Delivered APK copy lives at `~/workspace/your_files/LeoTVLauncher.apk`.
+
+## Version history
+
+- v1.0 (code 1): first delivery — home grid, App Lock tile first, D-pad PIN pad, per-app locks, change/remove PIN.
+- v1.1 (code 2): added `<queries>` so installed apps show on Android 11+, focus requested on resume, "Set as default" tile opening the system Home picker.
+- v1.2 (code 3): tiles made focusable+clickable with own listeners; added Android Settings / Launcher Settings / Organize tiles, folders (FolderActivity + Organize), 5 themes, 3 icon shapes.
+- v1.3 (code 4): root fix for D-pad navigation — replaced GridView/ListView with plain GridLayout tiles + LinearLayout rows inside scroll views; amber focus border on focused tiles. Added favorites (★ pinned first), hide/unhide apps, move up/down ordering, custom wallpaper from gallery, re-lock timer (always/1/5/15/60 min).
+- v1.4 (code 5): four suggested features + icon size control.
+  - Weather widget in the home header (Open-Meteo, no API key; city in Launcher Settings, default "New York", 30-min cache; needs INTERNET permission).
+  - Per-folder PINs: FolderActivity guard + "Folder PIN…" button; PinActivity modes 5/6/7 (set/confirm/unlock folder); hash stored on FolderStore.Folder.pin.
+  - "Set as default" tile auto-hides once the launcher is the default home (resolveActivity check).
+  - Double-press Home jumps focus to the first favorite (onNewIntent timing).
+  - Icon size control in Launcher Settings: Small 56 / Medium 72 / Large 88 / Extra large 104 dp; HomeActivity + FolderActivity size icons and tile heights from it (Theme.iconSizeDp).
+- v1.5 (code 6): kids mode, recent apps row, long-press organize (replaces the Organize screen).
+  - Kids mode: "Kids mode" tile (🧒) on home; entering requires a main PIN to exist and at least one allowed app (chosen in Launcher Settings → Kids mode → Allowed apps, via KidsSetupActivity). In kids mode only allowed apps + "Exit kids mode" tile show; exiting needs the PIN (PinActivity MODE_VERIFY_EXIT_KIDS, startActivityForResult). No long-press, no recents in kids mode.
+  - Recent row: "Recent" header + horizontal row of small tiles above the grid (last 8 launched apps; recorded in Apps.openApp and PinActivity MODE_UNLOCK; HomePrefs recents).
+  - Long-press (hold OK) on an app tile → menu: Move left / Move right, Add/Remove favorite, Create folder with this app, Add to folder…, Hide app, App info. Long-press on a folder tile → Rename / Delete. Long-press in FolderActivity on an app → Remove from folder. OrganizeActivity + activity_organize.xml deleted; AppEntry.isOrganizeTile removed.
+- v1.6 (code 7): live move mode.
+  - Long-press menu now has a single "Move app" item. Choosing it marks the tile with a permanent accent border and the hint becomes "D-pad to move • OK to place • Back to cancel".
+  - D-pad arrows move the app live in any direction (left/right = one slot, up/down = one row), grid rebuilds after each press with focus kept on the moving tile.
+  - OK/Enter drops it; Back cancels and restores the original position. Moving stays inside the app's own section (favorites or main list).
+- v1.7 (code 8): arrow PIN, lock in long-press menu, weather removed, tile fit.
+  - PIN is now 4 remote arrow presses (e.g. left-up-right-left); screen shows only progress dots so onlookers learn nothing. Back deletes one arrow / exits when empty. PinActivity captures DPAD_UP/DOWN/LEFT/RIGHT in dispatchKeyEvent; on-screen cross pad is touch-only.
+  - One-time migration: old digit PINs and folder PINs are wiped on first PIN screen (PinStore pin_ver 1→2, FolderStore.clearAllPins); user is asked to set a new arrow PIN. Locked-app list is kept.
+  - Long-press menu gains "🔒 Lock app" / "🔓 Unlock app"; locked apps show a 🔒 badge in the grid label. Kids mode opens allowed apps directly (no PIN prompt inside kids mode).
+  - Weather widget removed everywhere (header, settings, INTERNET permission, Weather.java deleted).
+  - Tile fit: item_app label 15sp with 2-line ellipsize, tighter padding; tile height = iconDp + 88.
+- v1.8 (code 9): Roku-style left navigation bar + uninstall option.
+  - Left sidebar (200dp, Roku-style) with menu items: Home, Favorites, Recent, Folders, App Lock, Kids mode, Settings. Selected view is highlighted in the accent color; focus moves between sidebar and grid with left/right on the D-pad. In kids mode the sidebar shows only "Exit kids mode".
+  - Content views: Home (favorites + folders + rest, unchanged behavior), Favorites (★ apps only, with empty-state hint), Recent (last-8 as full tiles, with empty-state hint; long-press here hides "Move app"), Folders (folder tiles only, with empty-state hint).
+  - The old settings tiles (App Lock / Kids mode / Set as default / Android Settings / Launcher Settings) are gone from the grid; their actions now live in the sidebar. "Set as default" moved to Launcher Settings → General → "Set as default launcher" (hidden when already default).
+  - AppEntry stripped of all tile-type flags; only real apps and folder tiles remain. makeTile no longer has a settings-tile branch.
+  - "🗑 Uninstall" added to the long-press menu on home (HomeActivity) and in folders (FolderActivity menu now has "Remove from folder" + "🗑 Uninstall"). Opens the system uninstall confirmation (ACTION_DELETE) for the package; system apps fall back to the system dialog.
+- v1.9 (code 10): uninstall fix, Manage apps in Settings, extra-small icons.
+  - Uninstall is now robust on TV: Apps.uninstall() tries the direct ACTION_DELETE flow, and if the device has no handler it falls back to the system App info screen (which always has an Uninstall button for user apps) instead of failing silently. Used by the long-press menu on home, in folders, and the new Manage apps screen.
+  - New "Manage apps" screen (Settings → General → Manage apps): full installed-app list with icons; selecting an app offers 🗑 Uninstall / App info / Hide-Unhide. Refreshes on resume so uninstalled apps vanish from the list.
+  - Icon size adds "Extra small" (40dp); options are now Extra small 40 / Small 56 / Medium 72 / Large 88 / Extra large 104.
+- v2.0 (code 11): uninstall honesty, Android settings row, title size, remove-from-recent.
+  - Uninstall now detects preinstalled system apps (YouTube, Netflix, etc.) and shows an honest dialog: can't be uninstalled by any launcher, with "Hide from home" and "App info" options. User apps use the direct uninstall flow with App-info fallback as before. Shared Apps.uninstall() with optional on-hidden refresh callback.
+  - Settings → General gains "Android settings" row opening the system settings app.
+  - New "App title size" setting (Small 13sp / Medium 15sp / Large 18sp / Extra large 21sp); applied to home grid tiles, recent strip, and folder tiles.
+  - Long-press menu gains "🕘 Remove from recent" for any app currently in recents; removes it from the recents list and rebuilds.
+- v2.2 (code 13): clock in sidebar, backup/restore, rename apps, settings PIN lock, boot app, sidebar customization.
+  - Sidebar now shows clock (HH:mm) + date at the top, non-focusable; shared 30s tick.
+  - Sidebar items have stable ids; order/hidden stored in prefs (sidebar_order, sidebar_hidden); kids-mode override unchanged. New SidebarCustomActivity (Settings → General → Customize sidebar): per-item Show/Hide/Move up/Move down dialog.
+  - Backup & restore (Settings → Backup & restore): whole SharedPreferences serialized to JSON via SAF create/open document; import validates app id.
+  - Rename apps: long-press → ✏️ Rename (EditText dialog, Save/Reset); HomePrefs custom_labels JSON; displayLabel() used in home grid, recent strip, folders, manage apps. Folder rename already existed.
+  - Lock settings with PIN: General checklist; requires existing arrow PIN; sidebar Settings entry routes through new PinActivity.MODE_VERIFY_SETTINGS.
+  - Boot app: General row with current choice; BootReceiver on BOOT_COMPLETED (RECEIVE_BOOT_COMPLETED) launches chosen app only if Leo is the default launcher.
+- v2.3 (code 14): notifications tab, sidebar everywhere, permission shortcuts, override launcher, header cleanup.
+  - New "🔔 Notifications" sidebar item (id "notifications", appended to DEFAULT_SIDEBAR; existing users get it auto-appended). NotifListener (NotificationListenerService, BIND_NOTIFICATION_LISTENER_SERVICE) collects the last 50 notifications in memory, newest first; NotificationsActivity shows them with app icon, title, text, relative time — OK opens the app, "Clear all" dismisses + clears. If access isn't granted, the screen points to Settings → General → Notification access.
+  - Settings → General gains "Notification access" (opens the system notification-listener settings), "Accessibility" (opens system accessibility settings), and "Override current launcher" (confirmation dialog → one-tap RoleManager home-role request; if Leo still isn't default afterwards it escalates to the system Home-app picker "choose Leo TV > Always", then Home settings as last resort).
+  - Sidebar now stays visible on every settings-style screen: new shared Sidebar helper (brand + live clock/date header, item builder, selection highlight, focus-by-id) and BaseSidebarActivity (host layout activity_sidebar_host.xml: 200dp sidebar + content frame). Settings, Manage apps, Customize sidebar, Kids setup, Folders, and Notifications all extend it; their content layouts inflate unchanged into the content frame.
+  - Sidebar actions from sub-screens route through HomeActivity.goTo(view, action) (singleTask + CLEAR_TOP); HomeActivity handles extra_view/extra_action in onCreate and onNewIntent, so Home/Favorites/Recent/Folders/App Lock/Kids mode/Settings/Notifications/Exit-kids all work from any screen.
+  - Main screen header removed: no more "Leo TV" title or clock/date on the main screen — the app name now sits at the top of the sidebar (accent, bold) above the clock/date.
+  - Customize-sidebar screen lists the new Notifications item via Sidebar.nameOf().
+- v2.4 (code 15): sidebar scroll fix, auto-folders, quick settings.
+  - Sidebar items now sit in a ScrollView (brand + clock/date stay fixed at top); D-pad focus auto-scrolls, so all items are reachable on small screens.
+  - Auto-create folders (Settings → General): new AutoFolders helper matches unorganized apps (skips favorites, hidden, already-foldered) against keyword lists into 🎬 Video / 🎵 Music / 🎮 Games / 🛠 Tools; preview dialog lists exactly what will be created, then creates the folders and moves the apps (min 2 apps per folder).
+  - New "⚡ Quick settings" sidebar item (id "quicksettings", ACT_QUICK_SETTINGS; auto-appended to DEFAULT_SIDEBAR). QuickSettingsActivity rows: Wi-Fi, Display, Sound, Storage, Date & time, About (open the real system pages), Sleep TV (tries the system shutdown prompt, falls back to a remote-power hint), Restart TV (tries the reboot intent, falls back to the About screen with a hint). Routed through HomeActivity.handleAction and BaseSidebarActivity like Notifications.

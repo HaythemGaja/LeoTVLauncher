@@ -1,0 +1,19 @@
+# Build output and binaries
+build/
+*.apk
+*.aab
+*.dex
+
+# Signing keys — never commit these
+*.keystore
+*.jks
+*.p12
+
+# Local SDK/JDK toolchains (the build script expects them next to this repo)
+sdk/
+jdk/
+
+# Editor / OS noise
+.DS_Store
+*.iml
+.idea/

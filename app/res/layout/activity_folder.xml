@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:padding="28dp">
+
+    <TextView
+        android:id="@+id/folder_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Folder"
+        android:textSize="30sp"
+        android:textStyle="bold"
+        android:textColor="@color/accent" />
+
+    <TextView
+        android:id="@+id/folder_subtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text=""
+        android:textSize="17sp"
+        android:textColor="@color/text2" />
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp">
+
+        <Button
+            android:id="@+id/btn_rename"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Rename" />
+
+        <Button
+            android:id="@+id/btn_delete_folder"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="Delete folder" />
+
+        <Button
+            android:id="@+id/btn_folder_pin"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="Folder PIN…" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="16dp"
+        android:fillViewport="true"
+        android:clipToPadding="false">
+
+        <GridLayout
+            android:id="@+id/folder_grid"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </ScrollView>
+</LinearLayout>
