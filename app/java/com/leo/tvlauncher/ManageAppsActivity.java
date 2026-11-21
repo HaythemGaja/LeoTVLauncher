@@ -1,7 +1,5 @@
 package com.leo.tvlauncher;
 
-import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -94,30 +92,44 @@ public class ManageAppsActivity extends BaseSidebarActivity {
                 "App info",
                 hidden ? "Unhide app" : "Hide app",
         };
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle(e.label)
-                .setItems(items, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        if (which == 0) {
-                            Apps.uninstall(ManageAppsActivity.this, e.pkg, e.label,
-                                    new Runnable() {
-                                        @Override public void run() { buildRows(); }
-                                    });
-                        } else if (which == 1) {
-                            try {
-                                startActivity(new Intent(
-                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                        Uri.parse("package:" + e.pkg)));
-                            } catch (ActivityNotFoundException ex) {
-                                Toast.makeText(ManageAppsActivity.this,
-                                        "App info not available", Toast.LENGTH_SHORT).show();
+                .setItems(
+                        items,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                if (which == 0) {
+                                    Apps.uninstall(
+                                            ManageAppsActivity.this,
+                                            e.pkg,
+                                            e.label,
+                                            new Runnable() {
+                                                @Override
+                                                public void run() {
+                                                    buildRows();
+                                                }
+                                            });
+                                } else if (which == 1) {
+                                    try {
+                                        startActivity(
+                                                new Intent(
+                                                        Settings
+                                                                .ACTION_APPLICATION_DETAILS_SETTINGS,
+                                                        Uri.parse("package:" + e.pkg)));
+                                    } catch (ActivityNotFoundException ex) {
+                                        Toast.makeText(
+                                                        ManageAppsActivity.this,
+                                                        "App info not available",
+                                                        Toast.LENGTH_SHORT)
+                                                .show();
+                                    }
+                                } else {
+                                    HomePrefs.setHidden(ManageAppsActivity.this, e.pkg, !hidden);
+                                    buildRows();
+                                }
                             }
-                        } else {
-                            HomePrefs.setHidden(ManageAppsActivity.this, e.pkg, !hidden);
-                            buildRows();
-                        }
-                    }
-                })
+                        })
                 .show();
     }
 }

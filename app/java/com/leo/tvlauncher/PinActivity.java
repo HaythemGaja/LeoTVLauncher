@@ -2,10 +2,8 @@ package com.leo.tvlauncher;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.Button;
@@ -73,8 +71,23 @@ public class PinActivity extends Activity {
         dotsView = findViewById(R.id.pin_dots);
         errorView = findViewById(R.id.pin_error);
 
-        Theme t = Theme.applyBase(this, titleView);
+        Theme t = Theme.current(this);
+        View panel = findViewById(R.id.pin_panel);
+        Theme.styleTree(panel, t);
+        panel.setBackground(Theme.surface(this, t.card, t.cardFocus, 1));
+        android.view.ViewGroup.LayoutParams panelLp = panel.getLayoutParams();
+        panelLp.width =
+                Math.min(
+                        Theme.dp(this, 520),
+                        getResources().getDisplayMetrics().widthPixels - Theme.dp(this, 48));
+        panel.setLayoutParams(panelLp);
+        titleView.setTextColor(t.text);
+        titleView.setTextSize(24);
         dotsView.setTextColor(t.accent);
+        errorView.setTextColor("light".equals(t.id) ? 0xFFB3261E : 0xFFFF7272);
+        ((TextView) findViewById(R.id.pin_help)).setTextColor(t.text2);
+        ((android.widget.ImageView) findViewById(R.id.pin_mark))
+                .setImageDrawable(new LeoIcon(LeoIcon.LOCK, t.accent));
 
         updateTitle();
         buildArrows();
@@ -116,48 +129,51 @@ public class PinActivity extends Activity {
             case MODE_SET_FOLDER: titleView.setText("Press 4 arrows for the folder PIN"); break;
             case MODE_CONFIRM_FOLDER: titleView.setText("Repeat the folder arrows"); break;
             case MODE_UNLOCK_FOLDER: titleView.setText("Enter folder arrow PIN"); break;
-            case MODE_VERIFY_EXIT_KIDS: titleView.setText("Enter arrow PIN to exit kids mode"); break;
+            case MODE_VERIFY_EXIT_KIDS:
+                titleView.setText("Enter arrow PIN to exit kids mode");
+                break;
             case MODE_VERIFY_SETTINGS: titleView.setText("Enter arrow PIN to open settings"); break;
         }
     }
 
-    /** 3x3 cross of arrow buttons (visual + touch input; remotes use dispatchKeyEvent). */
+    /** Touch remains available; physical remote arrows still enter the same four-arrow PIN. */
     private void buildArrows() {
-        GridLayout g = findViewById(R.id.pin_grid);
-        g.removeAllViews();
-        String[][] cells = {
-                {null, "▲|U", null},
-                {"◀|L", "⌫|DEL", "▶|R"},
-                {null, "▼|D", null},
+        GridLayout grid = findViewById(R.id.pin_grid);
+        grid.removeAllViews();
+        grid.setColumnCount(5);
+        String[][] keys = {
+            {"↑", "U", "Up"},
+            {"↓", "D", "Down"},
+            {"←", "L", "Left"},
+            {"→", "R", "Right"},
+            {"⌫", "DEL", "Delete"}
         };
-        for (int r = 0; r < 3; r++) {
-            for (int c = 0; c < 3; c++) {
-                if (cells[r][c] == null) continue;
-                String[] parts = cells[r][c].split("\\|");
-                final String action = parts[1];
-                Button b = new Button(this);
-                b.setText(parts[0]);
-                b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 34);
-                b.setTextColor(Color.WHITE);
-                b.setBackgroundResource(R.drawable.pin_btn);
-                b.setFocusable(false);
-                b.setClickable(true);
-                GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-                lp.width = 0;
-                lp.height = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 84,
-                        getResources().getDisplayMetrics());
-                lp.rowSpec = GridLayout.spec(r);
-                lp.columnSpec = GridLayout.spec(c, 1f);
-                lp.setMargins(10, 10, 10, 10);
-                b.setLayoutParams(lp);
-                b.setOnClickListener(new View.OnClickListener() {
-                    @Override public void onClick(View v) {
-                        if ("DEL".equals(action)) deleteOne();
-                        else onDirection(action);
-                    }
-                });
-                g.addView(b);
-            }
+        Theme t = Theme.current(this);
+        for (int i = 0; i < keys.length; i++) {
+            final String action = keys[i][1];
+            Button button = new Button(this);
+            button.setText(keys[i][0]);
+            button.setContentDescription(keys[i][2]);
+            button.setTextSize(25);
+            button.setTextColor(t.text);
+            button.setBackground(Theme.tileBackground(this, t));
+            button.setFocusable(false);
+            button.setClickable(true);
+            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+            lp.width = 0;
+            lp.height = Theme.dp(this, 52);
+            lp.columnSpec = GridLayout.spec(i, 1f);
+            lp.setMargins(
+                    Theme.dp(this, 4), Theme.dp(this, 4), Theme.dp(this, 4), Theme.dp(this, 4));
+            grid.addView(button, lp);
+            button.setOnClickListener(
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            if ("DEL".equals(action)) deleteOne();
+                            else onDirection(action);
+                        }
+                    });
         }
     }
 

@@ -2,7 +2,6 @@ package com.leo.tvlauncher;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.os.Bundle;
 import android.os.Handler;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -65,13 +64,17 @@ public abstract class BaseSidebarActivity extends Activity {
         clockHandler.removeCallbacks(clockTick);
     }
 
+    /** Repaint the same fixed sidebar when appearance is applied in-place. */
+    protected void refreshSidebarTheme() {
+        if(sidebar!=null)sidebar.build();
+    }
+
     protected void onSidebarAction(int action) {
         if (action == Sidebar.ACT_EXIT_KIDS) {
             Intent i = new Intent(this, PinActivity.class);
             i.putExtra("mode", PinActivity.MODE_VERIFY_EXIT_KIDS);
             startActivityForResult(i, REQ_EXIT_KIDS);
-        } else if (action == Sidebar.ACT_SETTINGS
-                && "settings".equals(sidebarSelectedId())) {
+        } else if (action == Sidebar.ACT_SETTINGS && "settings".equals(sidebarSelectedId())) {
             // Already on a settings screen; nothing to do.
         } else if (action == Sidebar.ACT_NOTIFICATIONS) {
             startActivity(new Intent(this, NotificationsActivity.class));

@@ -11,10 +11,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.Settings;
-import android.util.DisplayMetrics;
-import android.view.KeyEvent;
 import android.text.InputType;
-import android.view.LayoutInflater;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.GridLayout;
@@ -54,16 +52,17 @@ public class HomeActivity extends Activity {
     private Sidebar sidebar;
     private View root;
     private final Handler clockHandler = new Handler();
-    private final Map<String, Bitmap> iconCache = new HashMap<>();
     private final List<Integer> favTileIndices = new ArrayList<>();
     private long lastHomePress = 0;
     private Theme theme;
-    private final LayoutInflater[] inflater = new LayoutInflater[1];
     private int currentView = Sidebar.VIEW_HOME;
     // Live move mode state.
     private String movingPkg = null;
     private List<String> movingSnapshot = null;
     private int gridCols = 4;
+    private int measuredGridWidth = -1;
+    private final Map<String, AppEntry> catalog = new HashMap<>();
+    private String lastFocusedTag;
 
     private final Runnable clockTick = new Runnable() {
         @Override public void run() {
@@ -76,7 +75,6 @@ public class HomeActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
-        inflater[0] = LayoutInflater.from(this);
         root = findViewById(R.id.home_root);
         grid = findViewById(R.id.app_grid);
         sidebarBox = findViewById(R.id.sidebar);
@@ -86,6 +84,20 @@ public class HomeActivity extends Activity {
         recentHeader = findViewById(R.id.recent_header);
         recentScroller = findViewById(R.id.recent_scroller);
         recentRow = findViewById(R.id.recent_row);
+        grid.setClipChildren(false);
+        grid.setClipToPadding(false);
+        grid.addOnLayoutChangeListener(
+                new View.OnLayoutChangeListener() {
+                    @Override
+                    public void onLayoutChange(
+                            View v, int l, int t, int r, int b, int ol, int ot, int or, int ob) {
+                        int width = AppTiles.available(grid);
+                        if (width > 1 && width != measuredGridWidth) {
+                            measuredGridWidth = width;
+                            buildGrid();
+                        }
+                    }
+                });
         handleNavExtras(getIntent());
     }
 
@@ -133,6 +145,9 @@ public class HomeActivity extends Activity {
     }
 
     private void reload() {
+        View oldFocus = getCurrentFocus();
+        if (oldFocus != null && oldFocus.getTag() instanceof String)
+            lastFocusedTag = (String) oldFocus.getTag();
         theme = Theme.current(this);
         root.setBackgroundColor(theme.bg);
         boolean kids = HomePrefs.kidsMode(this);
@@ -142,8 +157,18 @@ public class HomeActivity extends Activity {
         hintView.setText(movingPkg != null ? "D-pad to move  •  OK to place  •  Back to cancel"
                 : (kids ? "PIN required to exit kids mode"
                 : "◀ Menu  •  D-pad to move  •  OK to open  •  Hold OK to organize"));
-        iconCache.clear();
+        catalog.clear();
+        for (AppEntry e : Apps.query(this)) catalog.put(e.pkg, e);
         applyWallpaper();
+        View scrim = findViewById(R.id.wallpaper_scrim);
+        scrim.setVisibility(
+                wallpaperView.getVisibility() == View.VISIBLE ? View.VISIBLE : View.GONE);
+        scrim.setBackground(
+                new android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                        new int[] {
+                            Theme.current(this).bg & 0xCCFFFFFF, Theme.current(this).bg | 0xF0000000
+                        }));
         sidebar = new Sidebar(this, sidebarBox, Sidebar.idForView(currentView),
                 new Sidebar.Listener() {
                     @Override public void onView(int view) { onSidebarView(view); }
@@ -152,6 +177,13 @@ public class HomeActivity extends Activity {
         sidebar.build();
         buildGrid();
         buildRecentRow();
+        if (lastFocusedTag != null) {
+            if (lastFocusedTag.startsWith("side:")) sidebar.focusItem(lastFocusedTag.substring(5));
+            else if (lastFocusedTag.startsWith("recent:")) {
+                View previous = recentRow.findViewWithTag(lastFocusedTag);
+                if (previous != null) previous.requestFocus();
+            } else focusTile(lastFocusedTag);
+        }
     }
 
     @Override
@@ -261,7 +293,8 @@ public class HomeActivity extends Activity {
     private void handleAction(int action) {
         if (action == Sidebar.ACT_LOCK) {
             Intent i = new Intent(this, PinActivity.class);
-            i.putExtra("mode", PinStore.hasPin(this) ? PinActivity.MODE_VERIFY : PinActivity.MODE_SET);
+            i.putExtra(
+                    "mode", PinStore.hasPin(this) ? PinActivity.MODE_VERIFY : PinActivity.MODE_SET);
             startActivity(i);
         } else if (action == Sidebar.ACT_KIDS) {
             enterKidsMode();
@@ -287,17 +320,25 @@ public class HomeActivity extends Activity {
     // --- Content grid ---
 
     private void buildGrid() {
+        View focused = getCurrentFocus();
+        String restoreTag =
+                focused != null && focused.getTag() instanceof String
+                        ? (String) focused.getTag()
+                        : lastFocusedTag;
         grid.removeAllViews();
         favTileIndices.clear();
-        DisplayMetrics dm = getResources().getDisplayMetrics();
-        int cols = Math.max(3, (int) (dm.widthPixels / dm.density / 190));
+        if (AppTiles.available(grid) <= 1) return; // Wait for the actual post-sidebar measurement.
+        int cols = AppTiles.columns(this, grid);
         grid.setColumnCount(cols);
         gridCols = cols;
 
         List<AppEntry> tiles = new ArrayList<>();
         Set<String> hidden = HomePrefs.hidden(this);
         Map<String, AppEntry> byPkg = new HashMap<>();
-        for (AppEntry e : Apps.query(this)) byPkg.put(e.pkg, e);
+        for (AppEntry e : catalog.values()) {
+            e.favorite = HomePrefs.isFav(this, e.pkg);
+            byPkg.put(e.pkg, e);
+        }
         boolean kids = HomePrefs.kidsMode(this);
 
         if (kids) {
@@ -349,7 +390,7 @@ public class HomeActivity extends Activity {
 
             List<String> order = HomePrefs.getList(this, "app_order");
             boolean orderChanged = false;
-            for (AppEntry e : Apps.query(this)) {
+            for (AppEntry e : sortedCatalog()) {
                 if (!hidden.contains(e.pkg) && FolderStore.folderOf(this, e.pkg) == null
                         && !favOrder.contains(e.pkg) && !order.contains(e.pkg)) {
                     order.add(e.pkg);
@@ -367,17 +408,32 @@ public class HomeActivity extends Activity {
         }
 
         for (AppEntry e : tiles) grid.addView(makeTile(e));
+        if (restoreTag != null && (focused == null || !restoreTag.startsWith("side:")))
+            focusTile(restoreTag);
+        TextView title = findViewById(R.id.home_title);
+        title.setText(
+                kids
+                        ? "Kids mode"
+                        : currentView == Sidebar.VIEW_FAVORITES
+                                ? "Favorites"
+                                : currentView == Sidebar.VIEW_RECENT
+                                        ? "Recent"
+                                        : currentView == Sidebar.VIEW_FOLDERS ? "Folders" : "Home");
+        title.setTextColor(theme.text);
 
         if (tiles.isEmpty()) {
             emptyView.setVisibility(View.VISIBLE);
             if (kids) {
-                emptyView.setText("No apps allowed yet.\nExit kids mode → Settings → Kids mode to choose apps.");
+                emptyView.setText(
+                        "No apps allowed yet.\n"
+                            + "Exit kids mode → Settings → Kids mode to choose apps.");
             } else if (currentView == Sidebar.VIEW_FAVORITES) {
                 emptyView.setText("No favorites yet.\nHold OK on an app → ☆ Add to favorites");
             } else if (currentView == Sidebar.VIEW_RECENT) {
                 emptyView.setText("Nothing recent yet.\nOpen some apps and they'll appear here.");
             } else if (currentView == Sidebar.VIEW_FOLDERS) {
-                emptyView.setText("No folders yet.\nHold OK on an app → Create folder with this app");
+                emptyView.setText(
+                        "No folders yet.\nHold OK on an app → Create folder with this app");
             } else {
                 emptyView.setText("No apps found.");
             }
@@ -392,65 +448,43 @@ public class HomeActivity extends Activity {
         return "tile:" + e.label;
     }
 
-    private View makeTile(final AppEntry e) {
-        View v = inflater[0].inflate(R.layout.item_app, grid, false);
-        v.setFocusable(true);
-        v.setFocusableInTouchMode(true);
-        v.setClickable(true);
-        v.setTag(tileTag(e));
-        int iconDp = Theme.iconSizeDp(this);
-        GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-        lp.width = 0;
-        lp.height = Theme.dp(this, iconDp + 88);
-        lp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
-        lp.setMargins(8, 8, 8, 8);
-        v.setLayoutParams(lp);
-        if (movingPkg != null && movingPkg.equals(e.pkg)) {
-            v.setBackground(Theme.movingTileBackground(this, theme));
-        } else {
-            v.setBackground(Theme.tileBackground(this, theme));
-        }
-        v.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View view) { handleTileClick(e); }
-        });
-        v.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override public boolean onLongClick(View view) { return onTileLongPress(e); }
-        });
-
-        ImageView icon = v.findViewById(R.id.app_icon);
-        TextView emoji = v.findViewById(R.id.lock_emoji);
-        TextView label = v.findViewById(R.id.app_label);
-        label.setTextColor(theme.text);
-        label.setTextSize(Theme.labelSizeSp(this));
-        if (e.isTile()) {
-            icon.setVisibility(View.GONE);
-            emoji.setVisibility(View.VISIBLE);
-            emoji.setText(e.tileEmoji());
-            label.setText(e.label);
-        } else {
-            emoji.setVisibility(View.GONE);
-            icon.setVisibility(View.VISIBLE);
-            boolean locked = PinStore.hasPin(this)
-                    && PinStore.lockedApps(this).contains(e.pkg);
-            String prefix = (locked ? "🔒 " : "") + (e.favorite ? "★ " : "");
-            label.setText(prefix + HomePrefs.displayLabel(this, e));
-            int px = Theme.dp(this, iconDp);
-            icon.getLayoutParams().width = px;
-            icon.getLayoutParams().height = px;
-            icon.setImageBitmap(shapedIcon(e, iconDp));
-        }
-        return v;
+    private List<AppEntry> sortedCatalog() {
+        List<AppEntry> result = new ArrayList<>(catalog.values());
+        java.util.Collections.sort(
+                result,
+                new java.util.Comparator<AppEntry>() {
+                    @Override
+                    public int compare(AppEntry a, AppEntry b) {
+                        return a.label.compareToIgnoreCase(b.label);
+                    }
+                });
+        return result;
     }
 
-    private Bitmap shapedIcon(AppEntry e, int iconDp) {
-        String shape = Theme.iconShape(this);
-        String key = e.pkg + "|" + shape + "|" + iconDp;
-        Bitmap b = iconCache.get(key);
-        if (b == null && e.icon != null) {
-            b = Theme.shapedIcon(e.icon, Theme.dp(this, iconDp), shape);
-            iconCache.put(key, b);
-        }
-        return b;
+    private View makeTile(final AppEntry e) {
+        int width = TileMetrics.width(AppTiles.available(grid), gridCols, Theme.dp(this, 8));
+        View v = AppTiles.create(this, e, width, catalog);
+        v.setTag(tileTag(e));
+        AppTiles.sizeGridTile(this, v, AppTiles.available(grid), gridCols);
+        if (movingPkg != null && movingPkg.equals(e.pkg))
+            v.setBackground(Theme.movingTileBackground(this, theme));
+        v.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        lastFocusedTag = tileTag(e);
+                        handleTileClick(e);
+                    }
+                });
+        v.setOnLongClickListener(
+                new View.OnLongClickListener() {
+                    @Override
+                    public boolean onLongClick(View view) {
+                        lastFocusedTag = tileTag(e);
+                        return onTileLongPress(e);
+                    }
+                });
+        return v;
     }
 
     private void buildRecentRow() {
@@ -461,7 +495,7 @@ public class HomeActivity extends Activity {
         if (show) {
             Set<String> hidden = HomePrefs.hidden(this);
             Map<String, AppEntry> byPkg = new HashMap<>();
-            for (AppEntry e : Apps.query(this)) byPkg.put(e.pkg, e);
+            for (AppEntry e : catalog.values()) byPkg.put(e.pkg, e);
             List<AppEntry> recents = new ArrayList<>();
             for (String pkg : HomePrefs.recents(this)) {
                 AppEntry e = byPkg.get(pkg);
@@ -477,31 +511,20 @@ public class HomeActivity extends Activity {
     }
 
     private View makeRecentTile(final AppEntry e) {
-        View v = inflater[0].inflate(R.layout.item_app, recentRow, false);
-        v.setFocusable(true);
-        v.setFocusableInTouchMode(true);
-        v.setClickable(true);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                Theme.dp(this, 132), Theme.dp(this, 108));
-        lp.setMargins(6, 6, 6, 6);
+        int width = Theme.dp(this, 176);
+        View v = AppTiles.create(this, e, width, catalog);
+        v.setTag("recent:" + e.pkg);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(width, -2);
+        lp.setMargins(Theme.dp(this, 8), Theme.dp(this, 8), Theme.dp(this, 8), Theme.dp(this, 12));
         v.setLayoutParams(lp);
-        v.setBackground(Theme.tileBackground(this, theme));
-        v.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View view) { Apps.openApp(HomeActivity.this, e); }
-        });
-        ImageView icon = v.findViewById(R.id.app_icon);
-        TextView emoji = v.findViewById(R.id.lock_emoji);
-        TextView label = v.findViewById(R.id.app_label);
-        label.setTextColor(theme.text);
-        label.setTextSize(Theme.labelSizeSp(this));
-        label.setMaxLines(1);
-        emoji.setVisibility(View.GONE);
-        icon.setVisibility(View.VISIBLE);
-        int px = Theme.dp(this, 52);
-        icon.getLayoutParams().width = px;
-        icon.getLayoutParams().height = px;
-        icon.setImageBitmap(shapedIcon(e, 52));
-        label.setText(HomePrefs.displayLabel(this, e));
+        v.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        lastFocusedTag = "recent:" + e.pkg;
+                        Apps.openApp(HomeActivity.this, e);
+                    }
+                });
         return v;
     }
 
@@ -566,15 +589,22 @@ public class HomeActivity extends Activity {
         items.add("✏️ Rename");
         if (HomePrefs.recents(this).contains(e.pkg)) items.add("🕘 Remove from recent");
         items.add("App info");
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle(e.label)
-                .setItems(items.toArray(new String[0]), new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        String item = ((AlertDialog) d).getListView()
-                                .getAdapter().getItem(which).toString();
-                        onOrganizeItem(e, item);
-                    }
-                })
+                .setItems(
+                        items.toArray(new String[0]),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                String item =
+                                        ((AlertDialog) d)
+                                                .getListView()
+                                                .getAdapter()
+                                                .getItem(which)
+                                                .toString();
+                                onOrganizeItem(e, item);
+                            }
+                        })
                 .show();
     }
 
@@ -647,24 +677,30 @@ public class HomeActivity extends Activity {
         String cur = HomePrefs.customLabel(this, e.pkg);
         input.setText(cur != null ? cur : e.label);
         input.selectAll();
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle("Rename app")
                 .setView(input)
-                .setPositiveButton("Save", new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        HomePrefs.setCustomLabel(HomeActivity.this, e.pkg,
-                                input.getText().toString());
-                        buildGrid();
-                        buildRecentRow();
-                    }
-                })
-                .setNeutralButton("Reset", new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        HomePrefs.setCustomLabel(HomeActivity.this, e.pkg, null);
-                        buildGrid();
-                        buildRecentRow();
-                    }
-                })
+                .setPositiveButton(
+                        "Save",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                HomePrefs.setCustomLabel(
+                                        HomeActivity.this, e.pkg, input.getText().toString());
+                                buildGrid();
+                                buildRecentRow();
+                            }
+                        })
+                .setNeutralButton(
+                        "Reset",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                HomePrefs.setCustomLabel(HomeActivity.this, e.pkg, null);
+                                buildGrid();
+                                buildRecentRow();
+                            }
+                        })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
@@ -716,20 +752,26 @@ public class HomeActivity extends Activity {
         final EditText input = new EditText(this);
         input.setText("Folder " + FolderStore.nextFolderNumber(this));
         input.selectAll();
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle("New folder")
                 .setView(input)
-                .setPositiveButton("Create", new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        String name = input.getText().toString().trim();
-                        if (name.isEmpty()) name = "Folder";
-                        FolderStore.Folder f = FolderStore.create(HomeActivity.this, name);
-                        FolderStore.moveTo(HomeActivity.this, e.pkg, f.id);
-                        buildGrid();
-                        Toast.makeText(HomeActivity.this,
-                                e.label + " moved to " + name, Toast.LENGTH_SHORT).show();
-                    }
-                })
+                .setPositiveButton(
+                        "Create",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                String name = input.getText().toString().trim();
+                                if (name.isEmpty()) name = "Folder";
+                                FolderStore.Folder f = FolderStore.create(HomeActivity.this, name);
+                                FolderStore.moveTo(HomeActivity.this, e.pkg, f.id);
+                                buildGrid();
+                                Toast.makeText(
+                                                HomeActivity.this,
+                                                e.label + " moved to " + name,
+                                                Toast.LENGTH_SHORT)
+                                        .show();
+                            }
+                        })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
@@ -738,28 +780,36 @@ public class HomeActivity extends Activity {
         final List<FolderStore.Folder> folders = FolderStore.getFolders(this);
         String[] names = new String[folders.size()];
         for (int i = 0; i < folders.size(); i++) names[i] = folders.get(i).name;
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle("Add to folder")
-                .setItems(names, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        FolderStore.Folder f = folders.get(which);
-                        FolderStore.moveTo(HomeActivity.this, e.pkg, f.id);
-                        buildGrid();
-                        Toast.makeText(HomeActivity.this,
-                                e.label + " moved to " + f.name, Toast.LENGTH_SHORT).show();
-                    }
-                })
+                .setItems(
+                        names,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                FolderStore.Folder f = folders.get(which);
+                                FolderStore.moveTo(HomeActivity.this, e.pkg, f.id);
+                                buildGrid();
+                                Toast.makeText(
+                                                HomeActivity.this,
+                                                e.label + " moved to " + f.name,
+                                                Toast.LENGTH_SHORT)
+                                        .show();
+                            }
+                        })
                 .show();
     }
 
     private void showFolderMenu(final AppEntry e) {
         final FolderStore.Folder f = FolderStore.get(this, e.folderId);
         if (f == null) return;
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle(f.name)
-                .setItems(new String[]{"Rename folder", "Delete folder"},
+                .setItems(
+                        new String[] {"Rename folder", "Delete folder"},
                         new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int which) {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
                                 if (which == 0) promptRenameFolder(f);
                                 else confirmDeleteFolder(f);
                             }
@@ -771,32 +821,38 @@ public class HomeActivity extends Activity {
         final EditText input = new EditText(this);
         input.setText(f.name);
         input.selectAll();
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle("Rename folder")
                 .setView(input)
-                .setPositiveButton("Save", new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        String name = input.getText().toString().trim();
-                        if (!name.isEmpty()) {
-                            FolderStore.rename(HomeActivity.this, f.id, name);
-                            buildGrid();
-                        }
-                    }
-                })
+                .setPositiveButton(
+                        "Save",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                String name = input.getText().toString().trim();
+                                if (!name.isEmpty()) {
+                                    FolderStore.rename(HomeActivity.this, f.id, name);
+                                    buildGrid();
+                                }
+                            }
+                        })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
     private void confirmDeleteFolder(final FolderStore.Folder f) {
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle("Delete folder?")
                 .setMessage("Apps inside will return to the home screen.")
-                .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        FolderStore.delete(HomeActivity.this, f.id);
-                        buildGrid();
-                    }
-                })
+                .setPositiveButton(
+                        "Delete",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                FolderStore.delete(HomeActivity.this, f.id);
+                                buildGrid();
+                            }
+                        })
                 .setNegativeButton("Cancel", null)
                 .show();
     }

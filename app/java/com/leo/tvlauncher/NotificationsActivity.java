@@ -8,7 +8,6 @@ import android.provider.Settings;
 import android.text.format.DateUtils;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -35,9 +34,10 @@ public class NotificationsActivity extends BaseSidebarActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setSidebarContent(R.layout.activity_settings);
-        ((TextView) findViewById(R.id.settings_title)).setText("🔔 Notifications");
+        ((TextView) findViewById(R.id.settings_title)).setText("Notifications");
         inflater = LayoutInflater.from(this);
         rows = findViewById(R.id.settings_rows);
+        findViewById(R.id.settings_category_scroll).setVisibility(View.GONE);
     }
 
     @Override
@@ -57,10 +57,15 @@ public class NotificationsActivity extends BaseSidebarActivity {
     private void buildRows() {
         rows.removeAllViews();
         if (!NotifListener.isEnabled(this)) {
-            addRow("Notification access is off",
-                    "Settings → General → Notification access to turn it on",
-                    null, new View.OnClickListener() {
-                        @Override public void onClick(View v) { openNotifSettings(); }
+            addRow(
+                    "Notification access is off",
+                    "Settings → System → Notification access to turn it on",
+                    null,
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            openNotifSettings();
+                        }
                     });
             return;
         }
@@ -69,13 +74,20 @@ public class NotificationsActivity extends BaseSidebarActivity {
             addRow("No notifications", "New notifications will appear here.", null, null);
             return;
         }
-        addRow("🧹  Clear all", notes.size() + " notification(s)",
-                null, new View.OnClickListener() {
-                    @Override public void onClick(View v) {
+        addRow(
+                "Clear all",
+                notes.size() + " notification(s)",
+                null,
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
                         NotifListener.clearAll();
                         buildRows();
-                        Toast.makeText(NotificationsActivity.this,
-                                "Notifications cleared", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(
+                                        NotificationsActivity.this,
+                                        "Notifications cleared",
+                                        Toast.LENGTH_SHORT)
+                                .show();
                     }
                 });
         Map<String, String> labels = new HashMap<>();
@@ -118,28 +130,7 @@ public class NotificationsActivity extends BaseSidebarActivity {
     private void addRow(String title, String sub,
                         android.graphics.drawable.Drawable icon,
                         View.OnClickListener onClick) {
-        View v = inflater.inflate(R.layout.item_lock, rows, false);
-        v.setFocusable(true);
-        v.setFocusableInTouchMode(true);
-        v.setClickable(true);
-        v.setBackground(Theme.tileBackground(this, theme));
-        if (onClick != null) v.setOnClickListener(onClick);
-        ImageView iv = v.findViewById(R.id.lock_icon);
-        TextView label = v.findViewById(R.id.lock_label);
-        TextView state = v.findViewById(R.id.lock_state);
-        label.setText(title);
-        label.setTextColor(theme.text);
-        label.setTextSize(19);
-        state.setText(sub == null ? "" : sub);
-        state.setTextColor(theme.text2);
-        state.setTextSize(15);
-        if (icon != null) {
-            iv.setVisibility(View.VISIBLE);
-            iv.setImageDrawable(icon);
-        } else {
-            iv.setVisibility(View.GONE);
-        }
-        rows.addView(v);
+        rows.addView(UtilityRows.create(this, title, sub, icon, onClick));
     }
 
     private void openApp(String pkg, String label) {

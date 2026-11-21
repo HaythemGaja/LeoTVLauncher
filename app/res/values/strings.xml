@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Leo TV Launcher</string>
+    <string name="home_title">Home</string>
+    <string name="settings_title">Settings</string>
+    <string name="pin_brand">LEO TV · FAMILY CONTROLS</string>
+    <string name="pin_title">Enter your arrow PIN</string>
+    <string name="pin_help">Use your remote arrows. Only dots appear on screen.
+Back deletes one arrow; Back when empty leaves this screen.</string>
 </resources>

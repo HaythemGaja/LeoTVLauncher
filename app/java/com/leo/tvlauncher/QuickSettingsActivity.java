@@ -6,7 +6,6 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -36,9 +35,10 @@ public class QuickSettingsActivity extends BaseSidebarActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setSidebarContent(R.layout.activity_settings);
-        ((TextView) findViewById(R.id.settings_title)).setText("⚡ Quick settings");
+        ((TextView) findViewById(R.id.settings_title)).setText("Quick settings");
         inflater = LayoutInflater.from(this);
         rows = findViewById(R.id.settings_rows);
+        findViewById(R.id.settings_category_scroll).setVisibility(View.GONE);
     }
 
     @Override
@@ -67,34 +67,39 @@ public class QuickSettingsActivity extends BaseSidebarActivity {
     private void buildRows() {
         rows.removeAllViews();
         Shortcut[] list = {
-                sc("📶", "Wi-Fi", "Networks & internet", Settings.ACTION_WIFI_SETTINGS),
-                sc("🖥", "Display", "Brightness, HDR, resolution", Settings.ACTION_DISPLAY_SETTINGS),
-                sc("🔊", "Sound", "Volume & audio output", Settings.ACTION_SOUND_SETTINGS),
-                sc("💾", "Storage", "Free space on this TV", Settings.ACTION_INTERNAL_STORAGE_SETTINGS),
-                sc("🕒", "Date & time", "Clock settings", Settings.ACTION_DATE_SETTINGS),
-                sc("ℹ", "About", "Device info", Settings.ACTION_DEVICE_INFO_SETTINGS),
-                sc("💤", "Sleep TV", "Turn the screen off", "sleep"),
-                sc("🔁", "Restart TV", "Reboot the device", "restart"),
+            sc("📶", "Wi-Fi", "Networks & internet", Settings.ACTION_WIFI_SETTINGS),
+            sc("🖥", "Display", "Brightness, HDR, resolution", Settings.ACTION_DISPLAY_SETTINGS),
+            sc("🔊", "Sound", "Volume & audio output", Settings.ACTION_SOUND_SETTINGS),
+            sc("💾", "Storage", "Free space on this TV", Settings.ACTION_INTERNAL_STORAGE_SETTINGS),
+            sc("🕒", "Date & time", "Clock settings", Settings.ACTION_DATE_SETTINGS),
+            sc("ℹ", "About", "Device info", Settings.ACTION_DEVICE_INFO_SETTINGS),
+            sc("💤", "Sleep TV", "Turn the screen off", "sleep"),
+            sc("🔁", "Restart TV", "Reboot the device", "restart"),
         };
-        for (final Shortcut s : list) {
-            View v = inflater.inflate(R.layout.item_lock, rows, false);
-            v.setFocusable(true);
-            v.setFocusableInTouchMode(true);
-            v.setClickable(true);
-            v.setBackground(Theme.tileBackground(this, theme));
-            v.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View view) { onShortcut(s); }
-            });
-            v.findViewById(R.id.lock_icon).setVisibility(View.GONE);
-            TextView label = v.findViewById(R.id.lock_label);
-            TextView state = v.findViewById(R.id.lock_state);
-            label.setText(s.emoji + "  " + s.label);
-            label.setTextColor(theme.text);
-            label.setTextSize(19);
-            state.setText(s.sub);
-            state.setTextColor(theme.text2);
-            state.setTextSize(15);
-            rows.addView(v);
+        int[] symbols = {
+            LeoIcon.WIFI,
+            LeoIcon.DISPLAY,
+            LeoIcon.SOUND,
+            LeoIcon.STORAGE,
+            LeoIcon.CLOCK,
+            LeoIcon.INFO,
+            LeoIcon.POWER,
+            LeoIcon.RESTART
+        };
+        for (int index = 0; index < list.length; index++) {
+            final Shortcut s = list[index];
+            rows.addView(
+                    UtilityRows.create(
+                            this,
+                            s.label,
+                            s.sub,
+                            new LeoIcon(symbols[index], theme.text2),
+                            new View.OnClickListener() {
+                                @Override
+                                public void onClick(View v) {
+                                    onShortcut(s);
+                                }
+                            }));
         }
     }
 

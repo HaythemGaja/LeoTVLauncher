@@ -1,18 +1,12 @@
 package com.leo.tvlauncher;
 
-import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.graphics.Bitmap;
 import android.os.Bundle;
-import android.util.DisplayMetrics;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.GridLayout;
-import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -28,9 +22,9 @@ public class FolderActivity extends BaseSidebarActivity {
     private GridLayout grid;
     private TextView titleView;
     private TextView subtitleView;
-    private final Map<String, Bitmap> iconCache = new HashMap<>();
     private Theme theme;
-    private LayoutInflater inflater;
+    private int measuredGridWidth = -1;
+    private String lastFocusedPkg;
 
     @Override
     protected String sidebarSelectedId() {
@@ -55,10 +49,24 @@ public class FolderActivity extends BaseSidebarActivity {
             return;
         }
         setSidebarContent(R.layout.activity_folder);
-        inflater = LayoutInflater.from(this);
         titleView = findViewById(R.id.folder_title);
         subtitleView = findViewById(R.id.folder_subtitle);
         grid = findViewById(R.id.folder_grid);
+        grid.setClipChildren(false);
+        grid.setClipToPadding(false);
+        grid.addOnLayoutChangeListener(
+                new View.OnLayoutChangeListener() {
+                    @Override
+                    public void onLayoutChange(
+                            View v, int l, int t, int r, int b, int ol, int ot, int or, int ob) {
+                        int width = AppTiles.available(grid);
+                        if (width > 1 && width != measuredGridWidth) {
+                            measuredGridWidth = width;
+                            FolderStore.Folder f = FolderStore.get(FolderActivity.this, folderId);
+                            if (f != null) buildGrid(f);
+                        }
+                    }
+                });
 
         Button rename = findViewById(R.id.btn_rename);
         Button delete = findViewById(R.id.btn_delete_folder);
@@ -91,7 +99,6 @@ public class FolderActivity extends BaseSidebarActivity {
         theme = Theme.applyBase(this, titleView);
         subtitleView.setTextColor(theme.text2);
         titleView.setText(f.name);
-        iconCache.clear();
         buildGrid(f);
         grid.post(new Runnable() {
             @Override public void run() {
@@ -103,9 +110,14 @@ public class FolderActivity extends BaseSidebarActivity {
     }
 
     private void buildGrid(FolderStore.Folder f) {
+        View focused = getCurrentFocus();
+        String restore =
+                focused != null && focused.getTag() instanceof String
+                        ? (String) focused.getTag()
+                        : lastFocusedPkg;
         grid.removeAllViews();
-        DisplayMetrics dm = getResources().getDisplayMetrics();
-        int cols = Math.max(3, (int) (dm.widthPixels / dm.density / 190));
+        if (AppTiles.available(grid) <= 1) return;
+        int cols = AppTiles.columns(this, grid);
         grid.setColumnCount(cols);
 
         Map<String, AppEntry> byPkg = new HashMap<>();
@@ -117,57 +129,41 @@ public class FolderActivity extends BaseSidebarActivity {
         }
         subtitleView.setText(apps.size() + (apps.size() == 1 ? " app" : " apps"));
 
-        String shape = Theme.iconShape(this);
-        final int iconDp = Theme.iconSizeDp(this);
+        int width = TileMetrics.width(AppTiles.available(grid), cols, Theme.dp(this, 8));
         for (final AppEntry e : apps) {
-            View v = inflater.inflate(R.layout.item_app, grid, false);
-            v.setFocusable(true);
-            v.setFocusableInTouchMode(true);
-            v.setClickable(true);
-            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-            lp.width = 0;
-            lp.height = Theme.dp(this, iconDp + 88);
-            lp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
-            lp.setMargins(8, 8, 8, 8);
-            v.setLayoutParams(lp);
-            v.setBackground(Theme.tileBackground(this, theme));
-            v.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View view) { Apps.openApp(FolderActivity.this, e); }
-            });
-            v.setOnLongClickListener(new View.OnLongClickListener() {
-                @Override public boolean onLongClick(View view) {
-                    showAppMenu(e);
-                    return true;
-                }
-            });
-            ImageView icon = v.findViewById(R.id.app_icon);
-            TextView emoji = v.findViewById(R.id.lock_emoji);
-            TextView label = v.findViewById(R.id.app_label);
-            emoji.setVisibility(View.GONE);
-            icon.setVisibility(View.VISIBLE);
-            label.setText(HomePrefs.displayLabel(this, e));
-            label.setTextColor(theme.text);
-            label.setTextSize(Theme.labelSizeSp(this));
-            String key = e.pkg + "|" + shape + "|" + iconDp;
-            Bitmap b = iconCache.get(key);
-            if (b == null && e.icon != null) {
-                b = Theme.shapedIcon(e.icon, Theme.dp(this, iconDp), shape);
-                iconCache.put(key, b);
-            }
-            int px = Theme.dp(this, iconDp);
-            icon.getLayoutParams().width = px;
-            icon.getLayoutParams().height = px;
-            icon.setImageBitmap(b);
+            View v = AppTiles.create(this, e, width, byPkg);
+            v.setTag(e.pkg);
+            AppTiles.sizeGridTile(this, v, AppTiles.available(grid), cols);
+            v.setOnClickListener(
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            lastFocusedPkg = e.pkg;
+                            Apps.openApp(FolderActivity.this, e);
+                        }
+                    });
+            v.setOnLongClickListener(
+                    new View.OnLongClickListener() {
+                        @Override
+                        public boolean onLongClick(View view) {
+                            showAppMenu(e);
+                            return true;
+                        }
+                    });
             grid.addView(v);
         }
+        View previous = restore == null ? null : grid.findViewWithTag(restore);
+        if (previous != null) previous.requestFocus();
     }
 
     private void showAppMenu(final AppEntry e) {
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle(e.label)
-                .setItems(new String[]{"Remove from folder", "🗑 Uninstall"},
+                .setItems(
+                        new String[] {"Remove from folder", "🗑 Uninstall"},
                         new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int which) {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
                                 if (which == 0) confirmRemoveFromFolder(e);
                                 else uninstallApp(e);
                             }
@@ -180,18 +176,25 @@ public class FolderActivity extends BaseSidebarActivity {
     }
 
     private void confirmRemoveFromFolder(final AppEntry e) {
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle(e.label)
                 .setMessage("Remove from this folder? It will return to the home screen.")
-                .setPositiveButton("Remove", new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        FolderStore.moveTo(FolderActivity.this, e.pkg, null);
-                        FolderStore.Folder f = FolderStore.get(FolderActivity.this, folderId);
-                        if (f != null) buildGrid(f);
-                        Toast.makeText(FolderActivity.this,
-                                e.label + " moved to home", Toast.LENGTH_SHORT).show();
-                    }
-                })
+                .setPositiveButton(
+                        "Remove",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                FolderStore.moveTo(FolderActivity.this, e.pkg, null);
+                                FolderStore.Folder f =
+                                        FolderStore.get(FolderActivity.this, folderId);
+                                if (f != null) buildGrid(f);
+                                Toast.makeText(
+                                                FolderActivity.this,
+                                                e.label + " moved to home",
+                                                Toast.LENGTH_SHORT)
+                                        .show();
+                            }
+                        })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
@@ -202,19 +205,26 @@ public class FolderActivity extends BaseSidebarActivity {
         final EditText input = new EditText(this);
         input.setText(f.name);
         input.selectAll();
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle("Rename folder")
                 .setView(input)
-                .setPositiveButton("Save", new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        String name = input.getText().toString().trim();
-                        if (!name.isEmpty()) {
-                            FolderStore.rename(FolderActivity.this, folderId, name);
-                            titleView.setText(name);
-                            Toast.makeText(FolderActivity.this, "Renamed", Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                })
+                .setPositiveButton(
+                        "Save",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                String name = input.getText().toString().trim();
+                                if (!name.isEmpty()) {
+                                    FolderStore.rename(FolderActivity.this, folderId, name);
+                                    titleView.setText(name);
+                                    Toast.makeText(
+                                                    FolderActivity.this,
+                                                    "Renamed",
+                                                    Toast.LENGTH_SHORT)
+                                            .show();
+                                }
+                            }
+                        })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
@@ -224,35 +234,44 @@ public class FolderActivity extends BaseSidebarActivity {
         String[] items = has
                 ? new String[]{"Change PIN", "Remove PIN"}
                 : new String[]{"Set PIN"};
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle("Folder PIN")
-                .setItems(items, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        if (has && which == 1) {
-                            FolderStore.clearPin(FolderActivity.this, folderId);
-                            Toast.makeText(FolderActivity.this, "Folder PIN removed",
-                                    Toast.LENGTH_SHORT).show();
-                        } else {
-                            Intent i = new Intent(FolderActivity.this, PinActivity.class);
-                            i.putExtra("mode", PinActivity.MODE_SET_FOLDER);
-                            i.putExtra("folder_id", folderId);
-                            startActivity(i);
-                        }
-                    }
-                })
+                .setItems(
+                        items,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                if (has && which == 1) {
+                                    FolderStore.clearPin(FolderActivity.this, folderId);
+                                    Toast.makeText(
+                                                    FolderActivity.this,
+                                                    "Folder PIN removed",
+                                                    Toast.LENGTH_SHORT)
+                                            .show();
+                                } else {
+                                    Intent i = new Intent(FolderActivity.this, PinActivity.class);
+                                    i.putExtra("mode", PinActivity.MODE_SET_FOLDER);
+                                    i.putExtra("folder_id", folderId);
+                                    startActivity(i);
+                                }
+                            }
+                        })
                 .show();
     }
 
     private void confirmDelete() {
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle("Delete folder?")
                 .setMessage("Apps inside will go back to the home screen.")
-                .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        FolderStore.delete(FolderActivity.this, folderId);
-                        finish();
-                    }
-                })
+                .setPositiveButton(
+                        "Delete",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                FolderStore.delete(FolderActivity.this, folderId);
+                                finish();
+                            }
+                        })
                 .setNegativeButton("Cancel", null)
                 .show();
     }

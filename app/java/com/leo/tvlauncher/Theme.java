@@ -27,8 +27,15 @@ public class Theme {
     public final int text;
     public final int text2;
 
-    private Theme(String id, String name, int bg, int card, int cardFocus,
-                  int accent, int text, int text2) {
+    private Theme(
+            String id,
+            String name,
+            int bg,
+            int card,
+            int cardFocus,
+            int accent,
+            int text,
+            int text2) {
         this.id = id;
         this.name = name;
         this.bg = bg;
@@ -40,16 +47,51 @@ public class Theme {
     }
 
     public static final Theme[] PRESETS = {
-            new Theme("midnight", "Midnight", 0xFF101418, 0xFF1C2126, 0xFF2A3138,
-                    0xFFFFB300, 0xFFFFFFFF, 0xFFB0BEC5),
-            new Theme("ocean", "Ocean", 0xFF0A1628, 0xFF12233D, 0xFF1B3355,
-                    0xFF4FC3F7, 0xFFFFFFFF, 0xFF90A4AE),
-            new Theme("forest", "Forest", 0xFF0C1A12, 0xFF14261B, 0xFF1E3A28,
-                    0xFF81C784, 0xFFFFFFFF, 0xFFA5BFA8),
-            new Theme("crimson", "Crimson", 0xFF1A0E0E, 0xFF2A1515, 0xFF3D1F1F,
-                    0xFFFF5252, 0xFFFFFFFF, 0xFFC9A9A9),
-            new Theme("light", "Light", 0xFFF5F5F5, 0xFFFFFFFF, 0xFFE0E0E0,
-                    0xFF1565C0, 0xFF212121, 0xFF757575),
+        new Theme(
+                "midnight",
+                "Midnight",
+                0xFF101418,
+                0xFF1C2126,
+                0xFF2A3138,
+                0xFFFFC168,
+                0xFFFFFFFF,
+                0xFFB0BEC5),
+        new Theme(
+                "ocean",
+                "Ocean",
+                0xFF0A1628,
+                0xFF12233D,
+                0xFF1B3355,
+                0xFF4FC3F7,
+                0xFFFFFFFF,
+                0xFF90A4AE),
+        new Theme(
+                "forest",
+                "Forest",
+                0xFF0C1A12,
+                0xFF14261B,
+                0xFF1E3A28,
+                0xFF81C784,
+                0xFFFFFFFF,
+                0xFFA5BFA8),
+        new Theme(
+                "crimson",
+                "Crimson",
+                0xFF1A0E0E,
+                0xFF2A1515,
+                0xFF3D1F1F,
+                0xFFFF5252,
+                0xFFFFFFFF,
+                0xFFC9A9A9),
+        new Theme(
+                "light",
+                "Light",
+                0xFFF5F5F5,
+                0xFFFFFFFF,
+                0xFFE0E0E0,
+                0xFF1565C0,
+                0xFF212121,
+                0xFF616161),
     };
 
     public static final String[] SHAPES = {"circle", "rounded", "square"};
@@ -94,7 +136,7 @@ public class Theme {
         if (v > 0) return v;
         // Auto: follow the icon size, clamped to readable bounds.
         int iconDp = iconSizeDp(c);
-        return Math.max(11, Math.min(22, Math.round(iconDp * 0.22f)));
+        return Math.max(17, Math.min(22, Math.round(iconDp * 0.25f)));
     }
 
     public static void setLabelSizeSp(Context c, int sp) {
@@ -106,53 +148,128 @@ public class Theme {
     }
 
     public static int dp(Context c, int dp) {
-        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp,
-                c.getResources().getDisplayMetrics());
+        return (int)
+                TypedValue.applyDimension(
+                        TypedValue.COMPLEX_UNIT_DIP, dp, c.getResources().getDisplayMetrics());
     }
 
-    /** Focus-aware tile background in the current palette. */
+    /** Shared states: focus, press, disabled and resting are deliberately different. */
     public static StateListDrawable tileBackground(Context c, Theme t) {
-        float r = dp(c, 12);
-        GradientDrawable normal = new GradientDrawable();
-        normal.setColor(t.card);
-        normal.setCornerRadius(r);
-        GradientDrawable focused = new GradientDrawable();
-        focused.setColor(t.cardFocus);
-        focused.setCornerRadius(r);
-        focused.setStroke(dp(c, 3), t.accent);
-        StateListDrawable s = new StateListDrawable();
-        s.addState(new int[]{android.R.attr.state_focused}, focused);
-        s.addState(new int[]{}, normal);
-        return s;
+        StateListDrawable states = new StateListDrawable();
+        states.addState(new int[] {-android.R.attr.state_enabled}, surface(c, t.card, 0, 0));
+        states.addState(
+                new int[] {android.R.attr.state_pressed}, surface(c, t.cardFocus, t.accent, 3));
+        states.addState(
+                new int[] {android.R.attr.state_focused}, surface(c, t.cardFocus, t.accent, 2));
+        states.addState(new int[] {android.R.attr.state_selected}, surface(c, t.cardFocus, 0, 0));
+        states.addState(new int[] {}, surface(c, t.card, 0, 0));
+        return states;
     }
 
-    /** Tile background while an app is being moved: always shows the accent border. */
+    public static GradientDrawable surface(Context c, int fill, int stroke, int width) {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(fill);
+        bg.setCornerRadius(dp(c, 14));
+        if (width > 0) bg.setStroke(dp(c, width), stroke);
+        return bg;
+    }
+
+    /** Always visible while moving, not confused with the focus outline. */
     public static StateListDrawable movingTileBackground(Context c, Theme t) {
-        float r = dp(c, 12);
-        GradientDrawable moving = new GradientDrawable();
-        moving.setColor(t.cardFocus);
-        moving.setCornerRadius(r);
-        moving.setStroke(dp(c, 4), t.accent);
-        StateListDrawable s = new StateListDrawable();
-        s.addState(new int[]{}, moving);
-        return s;
+        GradientDrawable bg = surface(c, t.cardFocus, t.accent, 2);
+        bg.setStroke(dp(c, 2), t.accent, dp(c, 7), dp(c, 4));
+        StateListDrawable states = new StateListDrawable();
+        states.addState(new int[] {}, bg);
+        return states;
     }
 
-    /** Paint activity root background + title in the current palette. */
+    public static boolean reducedMotion(Context c) {
+        if (prefs(c).getBoolean("reduce_motion", false)) return true;
+        try {
+            return android.provider.Settings.Global.getFloat(
+                            c.getContentResolver(),
+                            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+                            1f)
+                    == 0f;
+        } catch (SecurityException ignored) {
+            return false;
+        }
+    }
+
+    public static void setReducedMotion(Context c, boolean value) {
+        prefs(c).edit().putBoolean("reduce_motion", value).apply();
+    }
+
+    public static void focusMotion(final View view, final float focusedScale) {
+        view.setOnFocusChangeListener(
+                new View.OnFocusChangeListener() {
+                    @Override
+                    public void onFocusChange(View v, boolean focused) {
+                        v.animate().cancel();
+                        float scale = focused && !reducedMotion(v.getContext()) ? focusedScale : 1f;
+                        v.animate()
+                                .scaleX(scale)
+                                .scaleY(scale)
+                                .translationZ(focused ? dp(v.getContext(), 6) : 0)
+                                .setDuration(reducedMotion(v.getContext()) ? 0 : 160)
+                                .start();
+                    }
+                });
+    }
+
+    /** Palette + readable typography, including every child on utility screens. */
     public static Theme applyBase(Activity a, TextView titleView) {
         Theme t = current(a);
         View root = ((ViewGroup) a.findViewById(android.R.id.content)).getChildAt(0);
-        if (root != null) root.setBackgroundColor(t.bg);
-        if (titleView != null) titleView.setTextColor(t.accent);
+        if (root != null) {
+            root.setBackgroundColor(t.bg);
+            View content = a.findViewById(R.id.sidebar_content);
+            if (content instanceof ViewGroup && ((ViewGroup) content).getChildCount() > 0)
+                ((ViewGroup) content).getChildAt(0).setBackgroundColor(t.bg);
+            styleTree(root, t);
+        }
+        if (titleView != null) {
+            titleView.setTextColor(t.text);
+            titleView.setTextSize(30);
+            titleView.setTypeface(android.graphics.Typeface.create("sans-serif-medium", 0));
+        }
         return t;
+    }
+
+    public static void styleTree(View view, Theme t) {
+        // Design 1 was not selected. Keep the permanent sidebar and its layout intact.
+        if (view.getId() == R.id.sidebar) return;
+        if (view instanceof TextView) {
+            TextView text = (TextView) view;
+            text.setTypeface(android.graphics.Typeface.create("sans-serif", 0));
+            text.setTextColor(t.text);
+            if (view instanceof android.widget.Button) {
+                text.setAllCaps(false);
+                text.setTextSize(16);
+                text.setBackground(tileBackground(view.getContext(), t));
+                focusMotion(view, 1.015f);
+            }
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) styleTree(group.getChildAt(i), t);
+        }
+    }
+
+    /** Match the palette of all utility dialogs without changing their actions. */
+    public static android.app.AlertDialog.Builder dialog(Context c) {
+        return new android.app.AlertDialog.Builder(
+                c, "light".equals(current(c).id) ? R.style.LeoDialogLight : R.style.LeoDialog);
     }
 
     /** Clip an app icon to the chosen shape. */
     public static Bitmap shapedIcon(Drawable d, int sizePx, String shape) {
         Bitmap src = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(src);
+        android.graphics.Rect oldBounds = new android.graphics.Rect(d.getBounds());
         d.setBounds(0, 0, sizePx, sizePx);
         d.draw(c);
+        d.setBounds(oldBounds);
         Bitmap out = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
         Canvas c2 = new Canvas(out);
         Path p = new Path();
