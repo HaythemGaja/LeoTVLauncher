@@ -1,10 +1,8 @@
 package com.leo.tvlauncher;
 
-import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.text.format.DateUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -17,8 +15,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The sidebar's Notifications tab: every notification the TV has received
- * (newest first). OK on one to open its app, or clear them all.
+ * The sidebar's Notifications tab: every notification the TV has received (newest first). OK on one
+ * to open its app, or clear them all.
  */
 public class NotificationsActivity extends BaseSidebarActivity {
 
@@ -45,13 +43,15 @@ public class NotificationsActivity extends BaseSidebarActivity {
         super.onResume();
         theme = Theme.applyBase(this, (TextView) findViewById(R.id.settings_title));
         buildRows();
-        rows.post(new Runnable() {
-            @Override public void run() {
-                if (rows.getChildCount() > 0 && getCurrentFocus() == null) {
-                    rows.getChildAt(0).requestFocus();
-                }
-            }
-        });
+        rows.post(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        if (rows.getChildCount() > 0 && getCurrentFocus() == null) {
+                            rows.getChildAt(0).requestFocus();
+                        }
+                    }
+                });
     }
 
     private void buildRows() {
@@ -97,8 +97,7 @@ public class NotificationsActivity extends BaseSidebarActivity {
             String appLabel = labels.get(n.pkg);
             if (appLabel == null && !labels.containsKey(n.pkg)) {
                 try {
-                    android.content.pm.ApplicationInfo ai =
-                            pm.getApplicationInfo(n.pkg, 0);
+                    android.content.pm.ApplicationInfo ai = pm.getApplicationInfo(n.pkg, 0);
                     appLabel = pm.getApplicationLabel(ai).toString();
                     labels.put(n.pkg, appLabel);
                     try {
@@ -112,30 +111,37 @@ public class NotificationsActivity extends BaseSidebarActivity {
             }
             String sub = (n.text == null ? "" : n.text);
             if (sub.length() > 80) sub = sub.substring(0, 80) + "…";
-            String when = DateUtils.getRelativeTimeSpanString(
-                    n.when, System.currentTimeMillis(),
-                    DateUtils.MINUTE_IN_MILLIS).toString();
+            String when =
+                    DateUtils.getRelativeTimeSpanString(
+                                    n.when, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS)
+                            .toString();
             final String pkg = n.pkg;
             final String label = appLabel;
-            addRow((n.title == null || n.title.isEmpty() ? label : n.title),
+            addRow(
+                    (n.title == null || n.title.isEmpty() ? label : n.title),
                     label + "  •  " + when + (sub.isEmpty() ? "" : "\n" + sub),
-                    icons.get(n.pkg), new View.OnClickListener() {
-                        @Override public void onClick(View v) {
+                    icons.get(n.pkg),
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
                             openApp(pkg, label);
                         }
                     });
         }
     }
 
-    private void addRow(String title, String sub,
-                        android.graphics.drawable.Drawable icon,
-                        View.OnClickListener onClick) {
+    private void addRow(
+            String title,
+            String sub,
+            android.graphics.drawable.Drawable icon,
+            View.OnClickListener onClick) {
         rows.addView(UtilityRows.create(this, title, sub, icon, onClick));
     }
 
     private void openApp(String pkg, String label) {
         try {
             Intent launch = getPackageManager().getLaunchIntentForPackage(pkg);
+            if (launch == null) launch = getPackageManager().getLeanbackLaunchIntentForPackage(pkg);
             if (launch != null) {
                 startActivity(launch);
                 HomePrefs.pushRecent(this, pkg);
@@ -148,11 +154,6 @@ public class NotificationsActivity extends BaseSidebarActivity {
     }
 
     private void openNotifSettings() {
-        try {
-            startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
-        } catch (ActivityNotFoundException e) {
-            Toast.makeText(this, "Notification settings not available",
-                    Toast.LENGTH_SHORT).show();
-        }
+        AccessSettings.notificationAccess(this);
     }
 }

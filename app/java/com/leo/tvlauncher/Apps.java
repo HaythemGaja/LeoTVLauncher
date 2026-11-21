@@ -50,11 +50,14 @@ public class Apps {
                 out.add(e);
             }
         }
-        Collections.sort(out, new Comparator<AppEntry>() {
-            @Override public int compare(AppEntry a, AppEntry b) {
-                return a.label.compareToIgnoreCase(b.label);
-            }
-        });
+        Collections.sort(
+                out,
+                new Comparator<AppEntry>() {
+                    @Override
+                    public int compare(AppEntry a, AppEntry b) {
+                        return a.label.compareToIgnoreCase(b.label);
+                    }
+                });
         return out;
     }
 
@@ -80,6 +83,7 @@ public class Apps {
     public static void launch(Activity a, AppEntry e) {
         if (e.pkg == null) return;
         Intent launch = a.getPackageManager().getLaunchIntentForPackage(e.pkg);
+        if (launch == null) launch = a.getPackageManager().getLeanbackLaunchIntentForPackage(e.pkg);
         if (launch != null) {
             a.startActivity(launch);
             HomePrefs.pushRecent(a, e.pkg);
@@ -89,16 +93,15 @@ public class Apps {
     }
 
     /**
-     * Uninstall an app. System apps (preinstalled on the TV) cannot be
-     * uninstalled by any launcher, so those get an honest dialog offering
-     * Hide instead. User apps go through the direct system uninstall flow,
-     * falling back to the App info screen (which has an Uninstall button)
-     * on TVs where the direct flow has no handler.
+     * Uninstall an app. System apps (preinstalled on the TV) cannot be uninstalled by any launcher,
+     * so those get an honest dialog offering Hide instead. User apps go through the direct system
+     * uninstall flow, falling back to the App info screen (which has an Uninstall button) on TVs
+     * where the direct flow has no handler.
      *
      * @param onHidden optional callback run after the user hides a system app.
      */
-    public static void uninstall(final Activity a, final String pkg, final String label,
-                                 final Runnable onHidden) {
+    public static void uninstall(
+            final Activity a, final String pkg, final String label, final Runnable onHidden) {
         if (pkg == null) return;
         if (isSystemApp(a, pkg)) {
             Theme.dialog(a)
@@ -159,8 +162,10 @@ public class Apps {
     public static boolean isSystemApp(Context c, String pkg) {
         try {
             ApplicationInfo ai = c.getPackageManager().getApplicationInfo(pkg, 0);
-            return (ai.flags & (ApplicationInfo.FLAG_SYSTEM
-                    | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0;
+            return (ai.flags
+                            & (ApplicationInfo.FLAG_SYSTEM
+                                    | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP))
+                    != 0;
         } catch (Exception e) {
             return false;
         }
@@ -168,8 +173,9 @@ public class Apps {
 
     /** Open the system App info screen for a package. */
     public static void openAppInfo(Activity a, String pkg) {
-        a.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.parse("package:" + pkg)));
+        a.startActivity(
+                new Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + pkg)));
     }
 
     /** True when this launcher is the device's default home app. */
@@ -177,9 +183,10 @@ public class Apps {
         try {
             Intent i = new Intent(Intent.ACTION_MAIN);
             i.addCategory(Intent.CATEGORY_HOME);
-            ResolveInfo ri = c.getPackageManager().resolveActivity(
-                    i, PackageManager.MATCH_DEFAULT_ONLY);
-            return ri != null && ri.activityInfo != null
+            ResolveInfo ri =
+                    c.getPackageManager().resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY);
+            return ri != null
+                    && ri.activityInfo != null
                     && c.getPackageName().equals(ri.activityInfo.packageName);
         } catch (Exception e) {
             return false;

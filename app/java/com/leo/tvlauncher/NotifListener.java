@@ -1,7 +1,10 @@
 package com.leo.tvlauncher;
 
 import android.app.Notification;
+import android.app.NotificationManager;
+import android.content.ComponentName;
 import android.content.Context;
+import android.os.Build;
 import android.os.Bundle;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
@@ -10,9 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Collects the TV's notifications so the sidebar's Notifications tab can
- * show them. The user grants access once via Settings → General →
- * "Notification access". Kept in memory (last 50), newest first.
+ * Collects the TV's notifications so the sidebar's Notifications tab can show them. The user grants
+ * access once via Settings → General → "Notification access". Kept in memory (last 50), newest
+ * first.
  */
 public class NotifListener extends NotificationListenerService {
 
@@ -37,9 +40,19 @@ public class NotifListener extends NotificationListenerService {
     /** True when the user has granted this app notification access. */
     public static boolean isEnabled(Context c) {
         try {
-            String flat = android.provider.Settings.Secure.getString(
-                    c.getContentResolver(), "enabled_notification_listeners");
-            return flat != null && flat.contains(c.getPackageName());
+            ComponentName component = new ComponentName(c, NotifListener.class);
+            if (Build.VERSION.SDK_INT >= 27) {
+                NotificationManager manager = c.getSystemService(NotificationManager.class);
+                return manager != null && manager.isNotificationListenerAccessGranted(component);
+            }
+            String flat =
+                    android.provider.Settings.Secure.getString(
+                            c.getContentResolver(), "enabled_notification_listeners");
+            if (flat == null) return false;
+            for (String entry : flat.split(":")) {
+                if (component.equals(ComponentName.unflattenFromString(entry))) return true;
+            }
+            return false;
         } catch (Exception e) {
             return false;
         }
@@ -56,9 +69,36 @@ public class NotifListener extends NotificationListenerService {
     }
 
     @Override
-    public void onCreate() {
-        super.onCreate();
+    public void onListenerConnected() {
+        super.onListenerConnected();
         instance = this;
+        synchronized (NOTES) {
+            NOTES.clear();
+        }
+        try {
+            StatusBarNotification[] active = getActiveNotifications();
+            if (active != null) {
+                java.util.Arrays.sort(
+                        active,
+                        new java.util.Comparator<StatusBarNotification>() {
+                            @Override
+                            public int compare(StatusBarNotification a, StatusBarNotification b) {
+                                return Long.compare(a.getPostTime(), b.getPostTime());
+                            }
+                        });
+                for (StatusBarNotification note : active) onNotificationPosted(note);
+            }
+        } catch (SecurityException ignored) {
+        }
+    }
+
+    @Override
+    public void onListenerDisconnected() {
+        instance = null;
+        synchronized (NOTES) {
+            NOTES.clear();
+        }
+        super.onListenerDisconnected();
     }
 
     @Override
@@ -75,10 +115,14 @@ public class NotifListener extends NotificationListenerService {
         Notification n = sbn.getNotification();
         if (n == null) return;
         Bundle ex = n.extras;
-        String title = ex != null && ex.getCharSequence(Notification.EXTRA_TITLE) != null
-                ? ex.getCharSequence(Notification.EXTRA_TITLE).toString() : "";
-        String text = ex != null && ex.getCharSequence(Notification.EXTRA_TEXT) != null
-                ? ex.getCharSequence(Notification.EXTRA_TEXT).toString() : "";
+        String title =
+                ex != null && ex.getCharSequence(Notification.EXTRA_TITLE) != null
+                        ? ex.getCharSequence(Notification.EXTRA_TITLE).toString()
+                        : "";
+        String text =
+                ex != null && ex.getCharSequence(Notification.EXTRA_TEXT) != null
+                        ? ex.getCharSequence(Notification.EXTRA_TEXT).toString()
+                        : "";
         if (title.isEmpty() && text.isEmpty()) return;
         Note note = new Note();
         note.key = sbn.getKey();

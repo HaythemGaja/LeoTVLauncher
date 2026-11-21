@@ -5,8 +5,8 @@ import android.content.Context;
 import android.content.Intent;
 
 /**
- * Opens the user's chosen app when the TV boots — but only when Leo is the
- * default launcher, so it never hijacks boot for another launcher.
+ * Opens the user's chosen app when the TV boots — but only when Leo is the default launcher, so it
+ * never hijacks boot for another launcher.
  */
 public class BootReceiver extends BroadcastReceiver {
 
@@ -18,6 +18,8 @@ public class BootReceiver extends BroadcastReceiver {
         if (!Apps.isDefaultHome(c)) return;
         try {
             Intent launch = c.getPackageManager().getLaunchIntentForPackage(pkg);
+            if (launch == null)
+                launch = c.getPackageManager().getLeanbackLaunchIntentForPackage(pkg);
             if (launch == null) return;
             launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             c.startActivity(launch);

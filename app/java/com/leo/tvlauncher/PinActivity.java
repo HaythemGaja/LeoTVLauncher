@@ -12,13 +12,12 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 /**
- * Arrow PIN pad. The PIN is a sequence of 4 arrow-key presses on the remote
- * (up / down / left / right), so nobody watching the screen can read it.
- * Progress dots never reveal which arrows were pressed.
- * Back deletes one arrow (or exits when empty).
+ * Arrow PIN pad. The PIN is a sequence of 4 arrow-key presses on the remote (up / down / left /
+ * right), so nobody watching the screen can read it. Progress dots never reveal which arrows were
+ * pressed. Back deletes one arrow (or exits when empty).
  *
- * Modes: SET -> CONFIRM, UNLOCK (open a locked app), VERIFY (enter App Lock),
- * folder SET/CONFIRM/UNLOCK, VERIFY_EXIT_KIDS.
+ * <p>Modes: SET -> CONFIRM, UNLOCK (open a locked app), VERIFY (enter App Lock), folder
+ * SET/CONFIRM/UNLOCK, VERIFY_EXIT_KIDS.
  */
 public class PinActivity extends Activity {
 
@@ -58,8 +57,8 @@ public class PinActivity extends Activity {
         if (PinStore.needsMigration(this)) {
             boolean folderMode = (mode == MODE_UNLOCK_FOLDER);
             PinStore.migrate(this);
-            Toast.makeText(this, "PINs are now arrow presses — set a new one",
-                    Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "PINs are now arrow presses — set a new one", Toast.LENGTH_LONG)
+                    .show();
             if (folderMode) {
                 finish();
                 return;
@@ -100,10 +99,18 @@ public class PinActivity extends Activity {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             String d = null;
             switch (event.getKeyCode()) {
-                case KeyEvent.KEYCODE_DPAD_UP: d = "U"; break;
-                case KeyEvent.KEYCODE_DPAD_DOWN: d = "D"; break;
-                case KeyEvent.KEYCODE_DPAD_LEFT: d = "L"; break;
-                case KeyEvent.KEYCODE_DPAD_RIGHT: d = "R"; break;
+                case KeyEvent.KEYCODE_DPAD_UP:
+                    d = "U";
+                    break;
+                case KeyEvent.KEYCODE_DPAD_DOWN:
+                    d = "D";
+                    break;
+                case KeyEvent.KEYCODE_DPAD_LEFT:
+                    d = "L";
+                    break;
+                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                    d = "R";
+                    break;
                 case KeyEvent.KEYCODE_BACK:
                     if (pin.length() > 0) {
                         deleteOne();
@@ -122,17 +129,33 @@ public class PinActivity extends Activity {
 
     private void updateTitle() {
         switch (mode) {
-            case MODE_SET: titleView.setText("Press 4 arrows for your PIN"); break;
-            case MODE_CONFIRM: titleView.setText("Repeat the 4 arrows"); break;
-            case MODE_UNLOCK: titleView.setText("Enter arrow PIN to open app"); break;
-            case MODE_VERIFY: titleView.setText("Enter your arrow PIN"); break;
-            case MODE_SET_FOLDER: titleView.setText("Press 4 arrows for the folder PIN"); break;
-            case MODE_CONFIRM_FOLDER: titleView.setText("Repeat the folder arrows"); break;
-            case MODE_UNLOCK_FOLDER: titleView.setText("Enter folder arrow PIN"); break;
+            case MODE_SET:
+                titleView.setText("Press 4 arrows for your PIN");
+                break;
+            case MODE_CONFIRM:
+                titleView.setText("Repeat the 4 arrows");
+                break;
+            case MODE_UNLOCK:
+                titleView.setText("Enter arrow PIN to open app");
+                break;
+            case MODE_VERIFY:
+                titleView.setText("Enter your arrow PIN");
+                break;
+            case MODE_SET_FOLDER:
+                titleView.setText("Press 4 arrows for the folder PIN");
+                break;
+            case MODE_CONFIRM_FOLDER:
+                titleView.setText("Repeat the folder arrows");
+                break;
+            case MODE_UNLOCK_FOLDER:
+                titleView.setText("Enter folder arrow PIN");
+                break;
             case MODE_VERIFY_EXIT_KIDS:
                 titleView.setText("Enter arrow PIN to exit kids mode");
                 break;
-            case MODE_VERIFY_SETTINGS: titleView.setText("Enter arrow PIN to open settings"); break;
+            case MODE_VERIFY_SETTINGS:
+                titleView.setText("Enter arrow PIN to open settings");
+                break;
         }
     }
 
@@ -182,9 +205,14 @@ public class PinActivity extends Activity {
         if (pin.length() < PIN_LEN) pin.append(d);
         updateDots();
         if (pin.length() == PIN_LEN) {
-            handler.postDelayed(new Runnable() {
-                @Override public void run() { submit(); }
-            }, 220);
+            handler.postDelayed(
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            submit();
+                        }
+                    },
+                    220);
         }
     }
 
@@ -231,6 +259,8 @@ public class PinActivity extends Activity {
                 if (PinStore.checkPin(this, entered)) {
                     HomePrefs.setLastUnlock(this, System.currentTimeMillis());
                     Intent launch = getPackageManager().getLaunchIntentForPackage(targetPkg);
+                    if (launch == null)
+                        launch = getPackageManager().getLeanbackLaunchIntentForPackage(targetPkg);
                     finish();
                     if (launch != null) {
                         startActivity(launch);

@@ -1,6 +1,5 @@
 package com.leo.tvlauncher;
 
-import android.Manifest;
 import android.app.role.RoleManager;
 import android.content.ActivityNotFoundException;
 import android.content.DialogInterface;
@@ -29,7 +28,6 @@ import java.util.List;
 /** Theme, icon shape, wallpaper, re-lock timer. Plain rows for reliable D-pad. */
 public class SettingsActivity extends BaseSidebarActivity {
 
-    private static final int REQ_WALLPAPER_PERM = 100;
     private static final int REQ_PICK_IMAGE = 101;
     private static final int REQ_HOME_ROLE = 102;
     private static final int REQ_BACKUP_CREATE = 103;
@@ -49,7 +47,7 @@ public class SettingsActivity extends BaseSidebarActivity {
 
     private static class Row {
         String label;
-        String kind;   // theme, shape, wall, relock
+        String kind; // theme, shape, wall, relock
         String value;
     }
 
@@ -67,20 +65,22 @@ public class SettingsActivity extends BaseSidebarActivity {
         super.onResume();
         theme = Theme.applyBase(this, (TextView) findViewById(R.id.settings_title));
         buildRows();
-        rows.post(new Runnable() {
-            @Override public void run() {
-                if (rows.getChildCount() > 0 && getCurrentFocus() == null) {
-                    // Focus first real option, not the header.
-                    for (int i = 0; i < rows.getChildCount(); i++) {
-                        View v = rows.getChildAt(i);
-                        if (v.isFocusable()) {
-                            v.requestFocus();
-                            break;
+        rows.post(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        if (rows.getChildCount() > 0 && getCurrentFocus() == null) {
+                            // Focus first real option, not the header.
+                            for (int i = 0; i < rows.getChildCount(); i++) {
+                                View v = rows.getChildAt(i);
+                                if (v.isFocusable()) {
+                                    v.requestFocus();
+                                    break;
+                                }
+                            }
                         }
                     }
-                }
-            }
-        });
+                });
     }
 
     @Override
@@ -156,10 +156,23 @@ public class SettingsActivity extends BaseSidebarActivity {
                     minutes == 0 ? "Always ask for PIN" : "After " + minutes + " minutes",
                     "chooserelock");
         } else if ("System".equals(category)) {
-            if (!isDefaultHome())
-                addSummary("Set as default launcher", "Choose Leo TV as your Home app", "sethome");
+            addSummary(
+                    "Default Home app",
+                    isDefaultHome()
+                            ? "Leo TV is your default launcher"
+                            : "Not Leo TV · select Leo TV in Android settings",
+                    "sethome");
             addSummary("Android settings", "Open device settings", "syssettings");
-            addSummary("Notification access", "Manage access in Android settings", "notifaccess");
+            addSummary(
+                    "Notification access",
+                    NotifListener.isEnabled(this)
+                            ? "Allowed · manage or revoke in Android settings"
+                            : "Off · optional, read and clear TV notifications",
+                    "notifaccess");
+            addSummary(
+                    "Access & device limits",
+                    "What Leo needs and what Android controls",
+                    "accessinfo");
             addSummary("Accessibility", "Open device accessibility settings", "accessibility");
             addSummary(
                     "Override current launcher",
@@ -409,11 +422,31 @@ public class SettingsActivity extends BaseSidebarActivity {
             }
             return;
         } else if ("notifaccess".equals(r.kind)) {
-            try {
-                startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
-            } catch (ActivityNotFoundException ex) {
-                toast("Notification settings not available");
-            }
+            AccessSettings.notificationAccess(this);
+            return;
+        } else if ("accessinfo".equals(r.kind)) {
+            Theme.dialog(this)
+                    .setTitle("Access & device limits")
+                    .setMessage(
+                            "Home: choose Leo TV as the default Home app in Android's confirmation"
+                                + " screen. Leo cannot force this on a TV that blocks other"
+                                + " launchers.\n\n"
+                                + "Notifications: optional manual access, only for the"
+                                + " Notifications screen.\n\n"
+                                + "Wallpaper and backup: you select individual files; no broad"
+                                + " photo or storage grant is needed.\n\n"
+                                + "Apps: Leo discovers launchable apps, not every installed"
+                                + " package. Recents are apps opened through Leo, so usage access"
+                                + " is not needed.\n\n"
+                                + "Boot app: requires Leo as default Home. Android or the TV vendor"
+                                + " may block opening an app at boot.\n\n"
+                                + "Leo does not need overlay, usage access, an accessibility"
+                                + " service or device administration. Its PIN and kids mode only"
+                                + " protect navigation within Leo, not other launchers or Android"
+                                + " settings. Sleep and restart may be blocked by the TV; extra"
+                                + " permissions cannot make them universal.")
+                    .setPositiveButton("OK", null)
+                    .show();
             return;
         } else if ("accessibility".equals(r.kind)) {
             try {
@@ -464,8 +497,10 @@ public class SettingsActivity extends BaseSidebarActivity {
                 return;
             }
             HomePrefs.setSettingsLocked(this, !HomePrefs.settingsLocked(this));
-            toast(HomePrefs.settingsLocked(this)
-                    ? "Settings locked with PIN" : "Settings unlocked");
+            toast(
+                    HomePrefs.settingsLocked(this)
+                            ? "Settings locked with PIN"
+                            : "Settings unlocked");
         } else if ("backup".equals(r.kind)) {
             startBackup();
             return;
@@ -536,7 +571,10 @@ public class SettingsActivity extends BaseSidebarActivity {
         for (AppEntry e : apps) names.add(HomePrefs.displayLabel(this, e));
         int checked = 0;
         for (int i = 0; i < apps.size(); i++) {
-            if (apps.get(i).pkg.equals(cur)) { checked = i + 1; break; }
+            if (apps.get(i).pkg.equals(cur)) {
+                checked = i + 1;
+                break;
+            }
         }
         Theme.dialog(this)
                 .setTitle("Open app on TV start")
@@ -553,7 +591,9 @@ public class SettingsActivity extends BaseSidebarActivity {
                                 toast(
                                         which == 0
                                                 ? "No app opens on start"
-                                                : apps.get(which - 1).label + " opens on TV start");
+                                                : apps.get(which - 1).label
+                                                        + " selected. Requires Leo as default Home;"
+                                                        + " some TVs block boot launches.");
                                 buildRows();
                             }
                         })
@@ -624,8 +664,10 @@ public class SettingsActivity extends BaseSidebarActivity {
         try {
             Intent i = new Intent(Intent.ACTION_MAIN);
             i.addCategory(Intent.CATEGORY_HOME);
-            ResolveInfo ri = getPackageManager().resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY);
-            return ri != null && ri.activityInfo != null
+            ResolveInfo ri =
+                    getPackageManager().resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY);
+            return ri != null
+                    && ri.activityInfo != null
                     && getPackageName().equals(ri.activityInfo.packageName);
         } catch (Exception e) {
             return false;
@@ -636,11 +678,7 @@ public class SettingsActivity extends BaseSidebarActivity {
         requestHomeRole(false);
     }
 
-    /**
-     * Aggressively make Leo the default launcher: one-tap system dialog
-     * first, then the system Home-app picker (choose Leo TV > Always),
-     * then the Home settings page as a last resort.
-     */
+    /** Explain the change before opening Android's user-controlled Home selection. */
     private void overrideLauncher() {
         Theme.dialog(this)
                 .setTitle("Override current launcher")
@@ -675,27 +713,21 @@ public class SettingsActivity extends BaseSidebarActivity {
         }
         if (aggressive) openHomePicker();
         else {
-            try {
-                startActivity(new Intent(Settings.ACTION_HOME_SETTINGS));
-            } catch (ActivityNotFoundException e) {
-                toast("Open TV Settings > Apps > Default apps > Home app");
-            }
+            openHomePicker();
         }
     }
 
-    /** System Home-app picker: the user picks Leo TV and chooses Always. */
+    /** Android's settings control default Home; a generic chooser cannot set it reliably. */
     private void openHomePicker() {
         try {
-            Intent home = new Intent(Intent.ACTION_MAIN);
-            home.addCategory(Intent.CATEGORY_HOME);
-            home.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(Intent.createChooser(home, "Choose Leo TV as your launcher"));
-            toast("Pick Leo TV, then choose Always");
-        } catch (Exception e) {
+            startActivity(new Intent(Settings.ACTION_HOME_SETTINGS));
+        } catch (ActivityNotFoundException noHomeSettings) {
             try {
-                startActivity(new Intent(Settings.ACTION_HOME_SETTINGS));
-            } catch (ActivityNotFoundException ex) {
-                toast("Open TV Settings > Apps > Default apps > Home app");
+                startActivity(new Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS));
+            } catch (ActivityNotFoundException noDefaultSettings) {
+                toast(
+                        "Open TV Settings > Apps > Default apps > Home app. Some TVs do not allow"
+                            + " changing the Home app.");
             }
         }
     }
@@ -703,18 +735,12 @@ public class SettingsActivity extends BaseSidebarActivity {
     // --- Wallpaper picking ---
 
     private void pickWallpaper() {
-        String perm = Build.VERSION.SDK_INT >= 33
-                ? Manifest.permission.READ_MEDIA_IMAGES
-                : Manifest.permission.READ_EXTERNAL_STORAGE;
-        if (checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{perm}, REQ_WALLPAPER_PERM);
-            return;
-        }
+        // The picker grants access to the selected URI; the image is copied internally.
         openPicker();
     }
 
     private void openPicker() {
-        Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         i.setType("image/*");
         i.addCategory(Intent.CATEGORY_OPENABLE);
         try {
@@ -725,29 +751,20 @@ public class SettingsActivity extends BaseSidebarActivity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        if (requestCode == REQ_WALLPAPER_PERM
-                && grantResults.length > 0
-                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            openPicker();
-        } else if (requestCode == REQ_WALLPAPER_PERM) {
-            toast("Permission needed to pick an image");
-        }
-    }
-
-    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_HOME_ROLE) {
             if (isDefaultHome()) {
                 toast("Leo is now your default launcher");
             } else {
-                // The one-tap dialog didn't stick — escalate to the Home picker.
-                openHomePicker();
+                // Respect denial/cancellation instead of opening another grant prompt.
+                toast("Default launcher unchanged. You can try again from System settings.");
             }
             buildRows();
-        } else if (requestCode == REQ_PICK_IMAGE && resultCode == RESULT_OK
-                && data != null && data.getData() != null) {
+        } else if (requestCode == REQ_PICK_IMAGE
+                && resultCode == RESULT_OK
+                && data != null
+                && data.getData() != null) {
             if (saveWallpaper(data.getData())) {
                 HomePrefs.setWallpaperMode(this, "custom");
                 toast("Wallpaper set");
@@ -755,11 +772,15 @@ public class SettingsActivity extends BaseSidebarActivity {
                 toast("Couldn't load that image");
             }
             buildRows();
-        } else if (requestCode == REQ_BACKUP_CREATE && resultCode == RESULT_OK
-                && data != null && data.getData() != null) {
+        } else if (requestCode == REQ_BACKUP_CREATE
+                && resultCode == RESULT_OK
+                && data != null
+                && data.getData() != null) {
             doBackup(data.getData());
-        } else if (requestCode == REQ_RESTORE_OPEN && resultCode == RESULT_OK
-                && data != null && data.getData() != null) {
+        } else if (requestCode == REQ_RESTORE_OPEN
+                && resultCode == RESULT_OK
+                && data != null
+                && data.getData() != null) {
             doRestore(data.getData());
         }
     }

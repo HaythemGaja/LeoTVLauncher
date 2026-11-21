@@ -53,6 +53,27 @@ The available emulator did not reliably finish installing and launching Leo. No 
 - [ ] Measure startup, memory use and scroll/focus responsiveness with a large app library on a low-end TV. This branch still eagerly builds a GridLayout; it is not a recycled library or background catalog rewrite.
 - [ ] Check accessibility announcements and RTL navigation/text. Existing English strings have not been fully localized.
 
+## Access and permissions audit
+
+- Home: retain the HOME/DEFAULT activity filter and Android 10+ Home-role request. Add HOME package-query visibility for accurate default-Home checks. System settings now always show the current state. A cancelled role request stays cancelled. Older TVs use Home/default-app settings rather than claiming that a generic chooser can replace the default launcher.
+- App discovery: retain LAUNCHER and LEANBACK_LAUNCHER queries. No QUERY_ALL_PACKAGES grant. Add Leanback launch fallback for TV-only apps in normal, post-PIN, notification and boot launch paths.
+- Notifications: retain the service's system-only BIND_NOTIFICATION_LISTENER_SERVICE requirement and exported=false, matching the current Android reference. Remove the redundant top-level uses-permission, which cannot grant listener access. Show consent guidance before Android settings, prefer the component-specific page on Android 11+, and fall back to the listener list. Detect the exact listener grant, not a package-name substring. Load existing active notifications only after onListenerConnected; drop cached notes on disconnection.
+- Wallpaper: use ACTION_OPEN_DOCUMENT for a user-selected image, then copy it into Leo's private files. Remove broad READ_MEDIA_IMAGES and READ_EXTERNAL_STORAGE permissions and their blocking runtime prompt. Backup/restore already use document-picker URI grants and need no broad storage access.
+- Boot: retain RECEIVE_BOOT_COMPLETED, the real-boot action check and default-Home guard. This is not a guarantee that a TV vendor will allow a background app launch. No overlay grant is added to evade that restriction.
+- Uninstall: retain REQUEST_DELETE_PACKAGES and the system's confirmation. Leo cannot silently uninstall system apps.
+- Not needed: overlay, usage stats, an accessibility service, device administration, notification-posting or all-files access. Recents track launches through Leo, not device-wide usage. The existing Accessibility row opens device settings only and does not grant Leo an accessibility service.
+- Add an in-app Access & device limits explanation under System. It makes clear that PIN/kids mode only controls routes through Leo, not Android settings, other launchers or a device-owner kiosk. Sleep/restart remain vendor/system-controlled and retain the existing power-action caveat.
+
+Validation: `python3 tests/check-access.py` passes 18 source checks. These are assertions about source structure, not proof of Android/OEM behavior. Device checks still needed: Home role allow/cancel/change-back on API 24/28/29/34+, notification allow/revoke/reconnect with existing notifications, unavailable settings pages, wallpaper without photo permission, boot with and without Leo as default, and a TV-only Leanback package. Check long access text and dialogs visually on a real TV. No runtime visual evidence is claimed.
+
+Android sources used:
+
+- https://developer.android.com/reference/android/app/role/RoleManager
+- https://developer.android.com/training/package-visibility/declaring
+- https://developer.android.com/training/data-storage/shared/documents-files
+- https://developer.android.com/reference/android/service/notification/NotificationListenerService
+- https://developer.android.com/guide/components/activities/secure-bal
+
 ## Existing issues outside this visual branch
 
 The source review identified a notification app-launch route that bypasses the common app-PIN helper, insufficient backup schema/size validation, weak PIN retry protection and a Sleep TV label wired to a shutdown request. This visual branch does not fix those policy or behavior issues. They remain release blockers or safety follow-ups as described in the review. A nicer PIN panel is not stronger device security.
