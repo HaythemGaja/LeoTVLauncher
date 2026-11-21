@@ -7,6 +7,7 @@ public class AppEntry {
     public String label;
     public String pkg;
     public Drawable icon;
+    public Drawable banner; // activity banner, then application banner when available
 
     public String folderId = null; // set for folder tiles
     public boolean favorite = false; // shown with a star on home

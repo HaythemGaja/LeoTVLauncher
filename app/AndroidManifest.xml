@@ -12,24 +12,21 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
     </queries>
 
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
     <!-- Declares that this launcher can ask the system to uninstall packages
          (the actual uninstall still always goes through a system confirmation) -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- Lets the sidebar's Notifications tab show the TV's notifications
-         (the user grants access in Settings > General > Notification access) -->
-    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
-
     <application
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/ic_launcher"
-        android:theme="@android:style/Theme.Material.NoActionBar"
+        android:theme="@style/LeoTheme"
         android:hardwareAccelerated="true">
 
         <activity
@@ -51,6 +48,7 @@
 
         <activity
             android:name=".PinActivity"
+            android:theme="@style/LeoPinOverlay"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 

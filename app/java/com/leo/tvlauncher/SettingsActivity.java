@@ -1,8 +1,5 @@
 package com.leo.tvlauncher;
 
-import android.Manifest;
-import android.app.Activity;
-import android.app.AlertDialog;
 import android.app.role.RoleManager;
 import android.content.ActivityNotFoundException;
 import android.content.DialogInterface;
@@ -15,9 +12,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -33,7 +28,6 @@ import java.util.List;
 /** Theme, icon shape, wallpaper, re-lock timer. Plain rows for reliable D-pad. */
 public class SettingsActivity extends BaseSidebarActivity {
 
-    private static final int REQ_WALLPAPER_PERM = 100;
     private static final int REQ_PICK_IMAGE = 101;
     private static final int REQ_HOME_ROLE = 102;
     private static final int REQ_BACKUP_CREATE = 103;
@@ -41,7 +35,10 @@ public class SettingsActivity extends BaseSidebarActivity {
 
     private LinearLayout rows;
     private Theme theme;
-    private LayoutInflater inflater;
+    private String category = "Appearance";
+    private static final String[] CATEGORIES = {
+        "Appearance", "Layout & apps", "Family controls", "System", "Backup"
+    };
 
     @Override
     protected String sidebarSelectedId() {
@@ -50,9 +47,7 @@ public class SettingsActivity extends BaseSidebarActivity {
 
     private static class Row {
         String label;
-        boolean isHeader;
-        boolean checked;
-        String kind;   // theme, shape, wall, relock
+        String kind; // theme, shape, wall, relock
         String value;
     }
 
@@ -60,8 +55,9 @@ public class SettingsActivity extends BaseSidebarActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setSidebarContent(R.layout.activity_settings);
-        inflater = LayoutInflater.from(this);
         rows = findViewById(R.id.settings_rows);
+        if (savedInstanceState != null)
+            category = savedInstanceState.getString("category", "Appearance");
     }
 
     @Override
@@ -69,230 +65,349 @@ public class SettingsActivity extends BaseSidebarActivity {
         super.onResume();
         theme = Theme.applyBase(this, (TextView) findViewById(R.id.settings_title));
         buildRows();
-        rows.post(new Runnable() {
-            @Override public void run() {
-                if (rows.getChildCount() > 0 && getCurrentFocus() == null) {
-                    // Focus first real option, not the header.
-                    for (int i = 0; i < rows.getChildCount(); i++) {
-                        View v = rows.getChildAt(i);
-                        if (v.isFocusable()) {
-                            v.requestFocus();
-                            break;
+        rows.post(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        if (rows.getChildCount() > 0 && getCurrentFocus() == null) {
+                            // Focus first real option, not the header.
+                            for (int i = 0; i < rows.getChildCount(); i++) {
+                                View v = rows.getChildAt(i);
+                                if (v.isFocusable()) {
+                                    v.requestFocus();
+                                    break;
+                                }
+                            }
                         }
                     }
-                }
-            }
-        });
+                });
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle state) {
+        super.onSaveInstanceState(state);
+        state.putString("category", category);
     }
 
     private void buildRows() {
+        View focused = getCurrentFocus();
+        Object focusTag = focused == null ? null : focused.getTag();
         rows.removeAllViews();
-        List<Row> list = new ArrayList<>();
-
-        list.add(header("General"));
-        if (!isDefaultHome()) {
-            Row sh = new Row();
-            sh.label = "Set as default launcher";
-            sh.kind = "sethome";
-            sh.value = "";
-            list.add(sh);
+        LinearLayout tabs = findViewById(R.id.settings_categories);
+        tabs.removeAllViews();
+        for (final String name : CATEGORIES) {
+            TextView tab = new TextView(this);
+            tab.setText(name);
+            tab.setTextSize(15);
+            tab.setTextColor(theme.text);
+            tab.setPadding(
+                    Theme.dp(this, 14), Theme.dp(this, 12), Theme.dp(this, 14), Theme.dp(this, 12));
+            tab.setBackground(Theme.tileBackground(this, theme));
+            tab.setSelected(name.equals(category));
+            if (name.equals(category)) tab.setTextColor(theme.accent);
+            tab.setFocusable(true);
+            tab.setClickable(true);
+            tab.setTag("category:" + name);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+            lp.setMarginEnd(Theme.dp(this, 8));
+            tabs.addView(tab, lp);
+            tab.setOnClickListener(
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            category = name;
+                            buildRows();
+                        }
+                    });
         }
-        Row ma = new Row();
-        ma.label = "Manage apps";
-        ma.kind = "manageapps";
-        ma.value = "";
-        list.add(ma);
-        Row as = new Row();
-        as.label = "Android settings";
-        as.kind = "syssettings";
-        as.value = "";
-        list.add(as);
-        Row na = new Row();
-        na.label = "Notification access";
-        na.kind = "notifaccess";
-        na.value = "";
-        list.add(na);
-        Row ax = new Row();
-        ax.label = "Accessibility";
-        ax.kind = "accessibility";
-        ax.value = "";
-        list.add(ax);
-        Row ol = new Row();
-        ol.label = "Override current launcher";
-        ol.kind = "overridelauncher";
-        ol.value = "";
-        list.add(ol);
-        Row sb = new Row();
-        sb.label = "Customize sidebar";
-        sb.kind = "sidebaredit";
-        sb.value = "";
-        list.add(sb);
-        Row af = new Row();
-        af.label = "Auto-create folders";
-        af.kind = "autofolders";
-        af.value = "";
-        list.add(af);
-        Row ba = new Row();
-        ba.label = "Open app on TV start (" + bootAppName() + ")";
-        ba.kind = "bootapp";
-        ba.value = "";
-        list.add(ba);
-        Row sl = new Row();
-        sl.label = "Lock settings with PIN";
-        sl.kind = "settingslock";
-        sl.value = "";
-        sl.checked = HomePrefs.settingsLocked(this);
-        list.add(sl);
-
-        list.add(header("Background & theme"));
-        String curTheme = Theme.current(this).id;
-        for (Theme t : Theme.PRESETS) {
-            Row r = new Row();
-            r.label = t.name;
-            r.kind = "theme";
-            r.value = t.id;
-            r.checked = t.id.equals(curTheme);
-            list.add(r);
+        if ("Appearance".equals(category)) {
+            addSummary("Theme", Theme.current(this).name, "choosetheme");
+            addSummary("Icon fallback shape", shapeName(), "chooseshape");
+            addSummary(
+                    "Wallpaper",
+                    HomePrefs.wallpaperCustom(this) ? "Custom image" : "Theme color",
+                    "choosewall");
+            addSummary("Reduce motion", Theme.reducedMotion(this) ? "On" : "Off", "reducemotion");
+        } else if ("Layout & apps".equals(category)) {
+            addSummary(
+                    "Layout density",
+                    Theme.iconSizeDp(this) + " dp icon fallback · cards scale together",
+                    "choosesize");
+            addSummary(
+                    "App title size",
+                    Theme.labelSizeAuto(this)
+                            ? "Auto · readable at TV distance"
+                            : Theme.labelSizeSp(this) + " sp",
+                    "chooselabel");
+            addSummary("Manage apps", "Favorites, hidden apps and names", "manageapps");
+            addSummary("Customize sidebar", "Keep, hide and reorder destinations", "sidebaredit");
+            addSummary("Auto-create folders", "Review suggestions before applying", "autofolders");
+            addSummary("Open app on TV start", bootAppName(), "bootapp");
+        } else if ("Family controls".equals(category)) {
+            addSummary(
+                    "Allowed kids apps", HomePrefs.kidsApps(this).size() + " selected", "kidsapps");
+            addSummary(
+                    "Lock settings with PIN",
+                    HomePrefs.settingsLocked(this) ? "On" : "Off",
+                    "settingslock");
+            int minutes = HomePrefs.relockMinutes(this);
+            addSummary(
+                    "Re-lock locked apps",
+                    minutes == 0 ? "Always ask for PIN" : "After " + minutes + " minutes",
+                    "chooserelock");
+        } else if ("System".equals(category)) {
+            addSummary(
+                    "Default Home app",
+                    isDefaultHome()
+                            ? "Leo TV is your default launcher"
+                            : "Not Leo TV · select Leo TV in Android settings",
+                    "sethome");
+            addSummary("Android settings", "Open device settings", "syssettings");
+            addSummary(
+                    "Notification access",
+                    NotifListener.isEnabled(this)
+                            ? "Allowed · manage or revoke in Android settings"
+                            : "Off · optional, read and clear TV notifications",
+                    "notifaccess");
+            addSummary(
+                    "Access & device limits",
+                    "What Leo needs and what Android controls",
+                    "accessinfo");
+            addSummary("Accessibility", "Open device accessibility settings", "accessibility");
+            addSummary(
+                    "Override current launcher",
+                    "Review supported device options",
+                    "overridelauncher");
+        } else {
+            addSummary("Backup settings to file", "Save your existing settings as JSON", "backup");
+            addSummary(
+                    "Restore settings from file",
+                    "Replaces your current launcher settings",
+                    "restore");
         }
-
-        list.add(header("App icon shape"));
-        String curShape = Theme.iconShape(this);
-        for (int i = 0; i < Theme.SHAPES.length; i++) {
-            Row r = new Row();
-            r.label = Theme.SHAPE_NAMES[i];
-            r.kind = "shape";
-            r.value = Theme.SHAPES[i];
-            r.checked = Theme.SHAPES[i].equals(curShape);
-            list.add(r);
+        if (focusTag != null) {
+            View previous = tabs.findViewWithTag(focusTag);
+            if (previous == null) previous = rows.findViewWithTag(focusTag);
+            if (previous != null) previous.requestFocus();
         }
+    }
 
-        list.add(header("App icon size"));
-        int[] sizeDps = {40, 56, 72, 88, 104};
-        String[] sizeNames = {"Extra small", "Small", "Medium", "Large", "Extra large"};
-        int curSize = Theme.iconSizeDp(this);
-        for (int i = 0; i < sizeDps.length; i++) {
-            Row r = new Row();
-            r.label = sizeNames[i];
-            r.kind = "iconsize";
-            r.value = String.valueOf(sizeDps[i]);
-            r.checked = sizeDps[i] == curSize;
-            list.add(r);
-        }
+    private String shapeName() {
+        String shape = Theme.iconShape(this);
+        for (int i = 0; i < Theme.SHAPES.length; i++)
+            if (shape.equals(Theme.SHAPES[i])) return Theme.SHAPE_NAMES[i];
+        return "Rounded square";
+    }
 
-        list.add(header("App title size"));
-        int[] labelSps = {-1, 13, 15, 18, 21};
-        String[] labelNames = {"Auto (follow icon size)", "Small", "Medium", "Large", "Extra large"};
-        boolean autoLabel = Theme.labelSizeAuto(this);
-        int curLabel = Theme.labelSizeSp(this);
-        for (int i = 0; i < labelSps.length; i++) {
-            Row r = new Row();
-            r.label = labelNames[i];
-            r.kind = "labelsize";
-            r.value = String.valueOf(labelSps[i]);
-            r.checked = labelSps[i] < 0 ? autoLabel : (!autoLabel && labelSps[i] == curLabel);
-            list.add(r);
-        }
-
-        list.add(header("Kids mode"));
-        Row ka = new Row();
-        int allowed = HomePrefs.kidsApps(this).size();
-        ka.label = "Allowed apps (" + allowed + " selected)";
-        ka.kind = "kidsapps";
-        ka.value = "";
-        list.add(ka);
-
-        list.add(header("Wallpaper"));
-        Row w1 = new Row();
-        w1.label = "Theme color";
-        w1.kind = "wall";
-        w1.value = "theme";
-        w1.checked = !HomePrefs.wallpaperCustom(this);
-        list.add(w1);
-        Row w2 = new Row();
-        w2.label = "Custom image…";
-        w2.kind = "wall";
-        w2.value = "custom";
-        w2.checked = HomePrefs.wallpaperCustom(this);
-        list.add(w2);
-
-        list.add(header("Re-lock locked apps"));
-        String[][] relock = {
-                {"Always ask for PIN", "0"},
-                {"After 1 minute", "1"},
-                {"After 5 minutes", "5"},
-                {"After 15 minutes", "15"},
-                {"After 1 hour", "60"},
-        };
-        int curRelock = HomePrefs.relockMinutes(this);
-        for (String[] o : relock) {
-            Row r = new Row();
-            r.label = o[0];
-            r.kind = "relock";
-            r.value = o[1];
-            r.checked = Integer.parseInt(o[1]) == curRelock;
-            list.add(r);
-        }
-
-        list.add(header("Backup & restore"));
-        Row bk = new Row();
-        bk.label = "Backup settings to file";
-        bk.kind = "backup";
-        bk.value = "";
-        list.add(bk);
-        Row rs = new Row();
-        rs.label = "Restore settings from file";
-        rs.kind = "restore";
-        rs.value = "";
-        list.add(rs);
-
-        for (final Row r : list) {
-            View v = inflater.inflate(R.layout.item_lock, rows, false);
-            v.setFocusable(!r.isHeader);
-            v.setFocusableInTouchMode(!r.isHeader);
-            v.setClickable(!r.isHeader);
-            if (!r.isHeader) {
-                v.setBackground(Theme.tileBackground(this, theme));
-                v.setOnClickListener(new View.OnClickListener() {
-                    @Override public void onClick(View view) { onRowClick(r); }
+    private void addSummary(String title, String value, String kind) {
+        final Row row = new Row();
+        row.label = title;
+        row.kind = kind;
+        row.value = "";
+        LinearLayout v = new LinearLayout(this);
+        v.setOrientation(LinearLayout.VERTICAL);
+        int pad = Theme.dp(this, 18);
+        v.setPadding(pad, Theme.dp(this, 14), pad, Theme.dp(this, 14));
+        v.setBackground(Theme.tileBackground(this, theme));
+        v.setFocusable(true);
+        v.setClickable(true);
+        v.setTag("setting:" + kind);
+        TextView label = new TextView(this);
+        label.setText(title);
+        label.setTextColor(theme.text);
+        label.setTextSize(19);
+        label.setTypeface(android.graphics.Typeface.create("sans-serif-medium", 0));
+        TextView summary = new TextView(this);
+        summary.setText(value);
+        summary.setTextColor(theme.text2);
+        summary.setTextSize(15);
+        summary.setPadding(0, Theme.dp(this, 5), 0, 0);
+        v.addView(label);
+        v.addView(summary);
+        label.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        summary.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        v.setContentDescription(title + ", " + value);
+        Theme.focusMotion(v, 1.012f);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.bottomMargin = Theme.dp(this, 10);
+        rows.addView(v, lp);
+        v.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        onRowClick(row);
+                    }
                 });
-            }
-            ImageView icon = v.findViewById(R.id.lock_icon);
-            TextView label = v.findViewById(R.id.lock_label);
-            TextView state = v.findViewById(R.id.lock_state);
-            label.setText(r.label);
-            label.setTextSize(r.isHeader ? 16 : 20);
-            label.setTextColor(r.isHeader ? theme.text2 : theme.text);
-            if (r.isHeader) {
-                icon.setVisibility(View.GONE);
-                state.setText("");
-            } else {
-                icon.setVisibility(View.VISIBLE);
-                icon.setImageDrawable(null);
-                if ("theme".equals(r.kind)) {
-                    icon.setBackgroundColor(accentOf(r.value));
-                } else {
-                    icon.setBackgroundColor(0x00000000);
-                }
-                state.setText(r.checked ? "✓" : "");
-                state.setTextColor(theme.accent);
-            }
-            rows.addView(v);
-        }
     }
 
-    private Row header(String label) {
-        Row r = new Row();
-        r.label = label;
-        r.isHeader = true;
-        return r;
+    private void choose(
+            final String title,
+            final String kind,
+            final String[] labels,
+            final String[] values,
+            String current) {
+        int checked = 0;
+        for (int i = 0; i < values.length; i++) if (values[i].equals(current)) checked = i;
+        final int[] selected = {checked};
+        Theme.dialog(this)
+                .setTitle(title)
+                .setSingleChoiceItems(
+                        labels,
+                        checked,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                selected[0] = which;
+                            }
+                        })
+                .setPositiveButton(
+                        "Apply",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                Row r = new Row();
+                                r.kind = kind;
+                                r.value = values[selected[0]];
+                                onRowClick(r);
+                            }
+                        })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
-    private int accentOf(String themeId) {
-        for (Theme t : Theme.PRESETS) if (t.id.equals(themeId)) return t.accent;
-        return 0xFFFFB300;
+    /** A staged live preview: the persistent theme changes only when Apply is pressed. */
+    private void chooseTheme() {
+        final int[] selected = {0};
+        for (int i = 0; i < Theme.PRESETS.length; i++)
+            if (Theme.PRESETS[i].id.equals(Theme.current(this).id)) selected[0] = i;
+        LinearLayout preview = new LinearLayout(this);
+        preview.setOrientation(LinearLayout.VERTICAL);
+        preview.setPadding(
+                Theme.dp(this, 24), Theme.dp(this, 20), Theme.dp(this, 24), Theme.dp(this, 20));
+        final TextView heading = new TextView(this);
+        heading.setText("Leo TV · Home");
+        heading.setTextSize(25);
+        preview.addView(heading);
+        final TextView sample = new TextView(this);
+        sample.setText("Favorites     Recent     Folders");
+        sample.setTextSize(17);
+        sample.setPadding(
+                Theme.dp(this, 16), Theme.dp(this, 22), Theme.dp(this, 16), Theme.dp(this, 22));
+        LinearLayout.LayoutParams sampleLp = new LinearLayout.LayoutParams(-1, -2);
+        sampleLp.topMargin = Theme.dp(this, 18);
+        preview.addView(sample, sampleLp);
+        final Runnable paint =
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        Theme t = Theme.PRESETS[selected[0]];
+                        preview.setBackgroundColor(t.bg);
+                        heading.setTextColor(t.text);
+                        sample.setTextColor(t.text);
+                        sample.setBackground(
+                                Theme.surface(SettingsActivity.this, t.cardFocus, t.accent, 2));
+                    }
+                };
+        paint.run();
+        String[] names = new String[Theme.PRESETS.length];
+        for (int i = 0; i < names.length; i++) names[i] = Theme.PRESETS[i].name;
+        Theme.dialog(this)
+                .setTitle("Theme preview")
+                .setView(preview)
+                .setSingleChoiceItems(
+                        names,
+                        selected[0],
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                selected[0] = which;
+                                paint.run();
+                            }
+                        })
+                .setPositiveButton(
+                        "Apply",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                Row r = new Row();
+                                r.kind = "theme";
+                                r.value = Theme.PRESETS[selected[0]].id;
+                                onRowClick(r);
+                            }
+                        })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void onRowClick(Row r) {
+        if ("choosetheme".equals(r.kind)) {
+            chooseTheme();
+            return;
+        }
+        if ("chooseshape".equals(r.kind)) {
+            choose(
+                    "Icon fallback shape",
+                    "shape",
+                    Theme.SHAPE_NAMES,
+                    Theme.SHAPES,
+                    Theme.iconShape(this));
+            return;
+        }
+        if ("choosesize".equals(r.kind)) {
+            choose(
+                    "Layout density",
+                    "iconsize",
+                    new String[] {
+                        "Extra compact", "Compact", "Comfortable", "Large", "Extra large"
+                    },
+                    new String[] {"40", "56", "72", "88", "104"},
+                    String.valueOf(Theme.iconSizeDp(this)));
+            return;
+        }
+        if ("chooselabel".equals(r.kind)) {
+            choose(
+                    "App title size",
+                    "labelsize",
+                    new String[] {
+                        "Auto",
+                        "Small · 13 sp",
+                        "Medium · 15 sp",
+                        "Large · 18 sp",
+                        "Extra large · 21 sp"
+                    },
+                    new String[] {"-1", "13", "15", "18", "21"},
+                    Theme.labelSizeAuto(this) ? "-1" : String.valueOf(Theme.labelSizeSp(this)));
+            return;
+        }
+        if ("chooserelock".equals(r.kind)) {
+            choose(
+                    "Re-lock locked apps",
+                    "relock",
+                    new String[] {
+                        "Always ask",
+                        "After 1 minute",
+                        "After 5 minutes",
+                        "After 15 minutes",
+                        "After 1 hour"
+                    },
+                    new String[] {"0", "1", "5", "15", "60"},
+                    String.valueOf(HomePrefs.relockMinutes(this)));
+            return;
+        }
+        if ("choosewall".equals(r.kind)) {
+            choose(
+                    "Wallpaper",
+                    "wall",
+                    new String[] {"Theme color", "Custom image…"},
+                    new String[] {"theme", "custom"},
+                    HomePrefs.wallpaperCustom(this) ? "custom" : "theme");
+            return;
+        }
+        if ("reducemotion".equals(r.kind)) {
+            Theme.setReducedMotion(this, !Theme.reducedMotion(this));
+            buildRows();
+            return;
+        }
         if ("sethome".equals(r.kind)) {
             openHomeSettings();
             return;
@@ -307,11 +422,31 @@ public class SettingsActivity extends BaseSidebarActivity {
             }
             return;
         } else if ("notifaccess".equals(r.kind)) {
-            try {
-                startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
-            } catch (ActivityNotFoundException ex) {
-                toast("Notification settings not available");
-            }
+            AccessSettings.notificationAccess(this);
+            return;
+        } else if ("accessinfo".equals(r.kind)) {
+            Theme.dialog(this)
+                    .setTitle("Access & device limits")
+                    .setMessage(
+                            "Home: choose Leo TV as the default Home app in Android's confirmation"
+                                + " screen. Leo cannot force this on a TV that blocks other"
+                                + " launchers.\n\n"
+                                + "Notifications: optional manual access, only for the"
+                                + " Notifications screen.\n\n"
+                                + "Wallpaper and backup: you select individual files; no broad"
+                                + " photo or storage grant is needed.\n\n"
+                                + "Apps: Leo discovers launchable apps, not every installed"
+                                + " package. Recents are apps opened through Leo, so usage access"
+                                + " is not needed.\n\n"
+                                + "Boot app: requires Leo as default Home. Android or the TV vendor"
+                                + " may block opening an app at boot.\n\n"
+                                + "Leo does not need overlay, usage access, an accessibility"
+                                + " service or device administration. Its PIN and kids mode only"
+                                + " protect navigation within Leo, not other launchers or Android"
+                                + " settings. Sleep and restart may be blocked by the TV; extra"
+                                + " permissions cannot make them universal.")
+                    .setPositiveButton("OK", null)
+                    .show();
             return;
         } else if ("accessibility".equals(r.kind)) {
             try {
@@ -362,8 +497,10 @@ public class SettingsActivity extends BaseSidebarActivity {
                 return;
             }
             HomePrefs.setSettingsLocked(this, !HomePrefs.settingsLocked(this));
-            toast(HomePrefs.settingsLocked(this)
-                    ? "Settings locked with PIN" : "Settings unlocked");
+            toast(
+                    HomePrefs.settingsLocked(this)
+                            ? "Settings locked with PIN"
+                            : "Settings unlocked");
         } else if ("backup".equals(r.kind)) {
             startBackup();
             return;
@@ -372,6 +509,7 @@ public class SettingsActivity extends BaseSidebarActivity {
             return;
         }
         theme = Theme.applyBase(this, (TextView) findViewById(R.id.settings_title));
+        refreshSidebarTheme();
         buildRows();
     }
 
@@ -396,16 +534,20 @@ public class SettingsActivity extends BaseSidebarActivity {
             }
             sb.append("\n\n");
         }
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle("Create these folders?")
-                .setMessage(sb.toString().trim()
-                        + "\nFavorites and apps already in folders stay where they are.")
-                .setPositiveButton("Create", new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        int moved = AutoFolders.apply(SettingsActivity.this, plans);
-                        toast(moved + " apps sorted into " + plans.size() + " folders");
-                    }
-                })
+                .setMessage(
+                        sb.toString().trim()
+                                + "\nFavorites and apps already in folders stay where they are.")
+                .setPositiveButton(
+                        "Create",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                int moved = AutoFolders.apply(SettingsActivity.this, plans);
+                                toast(moved + " apps sorted into " + plans.size() + " folders");
+                            }
+                        })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
@@ -429,18 +571,29 @@ public class SettingsActivity extends BaseSidebarActivity {
         for (AppEntry e : apps) names.add(HomePrefs.displayLabel(this, e));
         int checked = 0;
         for (int i = 0; i < apps.size(); i++) {
-            if (apps.get(i).pkg.equals(cur)) { checked = i + 1; break; }
+            if (apps.get(i).pkg.equals(cur)) {
+                checked = i + 1;
+                break;
+            }
         }
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle("Open app on TV start")
-                .setSingleChoiceItems(names.toArray(new String[0]), checked,
+                .setSingleChoiceItems(
+                        names.toArray(new String[0]),
+                        checked,
                         new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int which) {
-                                HomePrefs.setBootApp(SettingsActivity.this,
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                HomePrefs.setBootApp(
+                                        SettingsActivity.this,
                                         which == 0 ? null : apps.get(which - 1).pkg);
                                 d.dismiss();
-                                toast(which == 0 ? "No app opens on start"
-                                        : apps.get(which - 1).label + " opens on TV start");
+                                toast(
+                                        which == 0
+                                                ? "No app opens on start"
+                                                : apps.get(which - 1).label
+                                                        + " selected. Requires Leo as default Home;"
+                                                        + " some TVs block boot launches.");
                                 buildRows();
                             }
                         })
@@ -511,8 +664,10 @@ public class SettingsActivity extends BaseSidebarActivity {
         try {
             Intent i = new Intent(Intent.ACTION_MAIN);
             i.addCategory(Intent.CATEGORY_HOME);
-            ResolveInfo ri = getPackageManager().resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY);
-            return ri != null && ri.activityInfo != null
+            ResolveInfo ri =
+                    getPackageManager().resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY);
+            return ri != null
+                    && ri.activityInfo != null
                     && getPackageName().equals(ri.activityInfo.packageName);
         } catch (Exception e) {
             return false;
@@ -523,21 +678,21 @@ public class SettingsActivity extends BaseSidebarActivity {
         requestHomeRole(false);
     }
 
-    /**
-     * Aggressively make Leo the default launcher: one-tap system dialog
-     * first, then the system Home-app picker (choose Leo TV > Always),
-     * then the Home settings page as a last resort.
-     */
+    /** Explain the change before opening Android's user-controlled Home selection. */
     private void overrideLauncher() {
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle("Override current launcher")
-                .setMessage("This makes Leo TV your home screen, replacing the " +
-                        "current launcher. You'll confirm it on the next screen.")
-                .setPositiveButton("Continue", new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        requestHomeRole(true);
-                    }
-                })
+                .setMessage(
+                        "This makes Leo TV your home screen, replacing the "
+                                + "current launcher. You'll confirm it on the next screen.")
+                .setPositiveButton(
+                        "Continue",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                requestHomeRole(true);
+                            }
+                        })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
@@ -558,27 +713,21 @@ public class SettingsActivity extends BaseSidebarActivity {
         }
         if (aggressive) openHomePicker();
         else {
-            try {
-                startActivity(new Intent(Settings.ACTION_HOME_SETTINGS));
-            } catch (ActivityNotFoundException e) {
-                toast("Open TV Settings > Apps > Default apps > Home app");
-            }
+            openHomePicker();
         }
     }
 
-    /** System Home-app picker: the user picks Leo TV and chooses Always. */
+    /** Android's settings control default Home; a generic chooser cannot set it reliably. */
     private void openHomePicker() {
         try {
-            Intent home = new Intent(Intent.ACTION_MAIN);
-            home.addCategory(Intent.CATEGORY_HOME);
-            home.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(Intent.createChooser(home, "Choose Leo TV as your launcher"));
-            toast("Pick Leo TV, then choose Always");
-        } catch (Exception e) {
+            startActivity(new Intent(Settings.ACTION_HOME_SETTINGS));
+        } catch (ActivityNotFoundException noHomeSettings) {
             try {
-                startActivity(new Intent(Settings.ACTION_HOME_SETTINGS));
-            } catch (ActivityNotFoundException ex) {
-                toast("Open TV Settings > Apps > Default apps > Home app");
+                startActivity(new Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS));
+            } catch (ActivityNotFoundException noDefaultSettings) {
+                toast(
+                        "Open TV Settings > Apps > Default apps > Home app. Some TVs do not allow"
+                            + " changing the Home app.");
             }
         }
     }
@@ -586,18 +735,12 @@ public class SettingsActivity extends BaseSidebarActivity {
     // --- Wallpaper picking ---
 
     private void pickWallpaper() {
-        String perm = Build.VERSION.SDK_INT >= 33
-                ? Manifest.permission.READ_MEDIA_IMAGES
-                : Manifest.permission.READ_EXTERNAL_STORAGE;
-        if (checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{perm}, REQ_WALLPAPER_PERM);
-            return;
-        }
+        // The picker grants access to the selected URI; the image is copied internally.
         openPicker();
     }
 
     private void openPicker() {
-        Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         i.setType("image/*");
         i.addCategory(Intent.CATEGORY_OPENABLE);
         try {
@@ -608,29 +751,20 @@ public class SettingsActivity extends BaseSidebarActivity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        if (requestCode == REQ_WALLPAPER_PERM
-                && grantResults.length > 0
-                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            openPicker();
-        } else if (requestCode == REQ_WALLPAPER_PERM) {
-            toast("Permission needed to pick an image");
-        }
-    }
-
-    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_HOME_ROLE) {
             if (isDefaultHome()) {
                 toast("Leo is now your default launcher");
             } else {
-                // The one-tap dialog didn't stick — escalate to the Home picker.
-                openHomePicker();
+                // Respect denial/cancellation instead of opening another grant prompt.
+                toast("Default launcher unchanged. You can try again from System settings.");
             }
             buildRows();
-        } else if (requestCode == REQ_PICK_IMAGE && resultCode == RESULT_OK
-                && data != null && data.getData() != null) {
+        } else if (requestCode == REQ_PICK_IMAGE
+                && resultCode == RESULT_OK
+                && data != null
+                && data.getData() != null) {
             if (saveWallpaper(data.getData())) {
                 HomePrefs.setWallpaperMode(this, "custom");
                 toast("Wallpaper set");
@@ -638,11 +772,15 @@ public class SettingsActivity extends BaseSidebarActivity {
                 toast("Couldn't load that image");
             }
             buildRows();
-        } else if (requestCode == REQ_BACKUP_CREATE && resultCode == RESULT_OK
-                && data != null && data.getData() != null) {
+        } else if (requestCode == REQ_BACKUP_CREATE
+                && resultCode == RESULT_OK
+                && data != null
+                && data.getData() != null) {
             doBackup(data.getData());
-        } else if (requestCode == REQ_RESTORE_OPEN && resultCode == RESULT_OK
-                && data != null && data.getData() != null) {
+        } else if (requestCode == REQ_RESTORE_OPEN
+                && resultCode == RESULT_OK
+                && data != null
+                && data.getData() != null) {
             doRestore(data.getData());
         }
     }

@@ -1,32 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/bg"
-    android:padding="28dp">
-
-    <TextView
-        android:id="@+id/settings_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Launcher Settings"
-        android:textSize="30sp"
-        android:textStyle="bold"
-        android:textColor="@color/accent" />
-
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="16dp"
-        android:fillViewport="true"
-        android:clipToPadding="false">
-
-        <LinearLayout
-            android:id="@+id/settings_rows"
-            android:orientation="vertical"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/bg" android:padding="28dp">
+    <TextView android:id="@+id/settings_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/settings_title" android:textSize="30sp" android:fontFamily="sans-serif-medium" android:textColor="@color/text" />
+    <HorizontalScrollView android:id="@+id/settings_category_scroll" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:scrollbars="none">
+        <LinearLayout android:id="@+id/settings_categories" android:orientation="horizontal" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </HorizontalScrollView>
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="20dp" android:clipToPadding="false" android:fillViewport="true">
+        <LinearLayout android:id="@+id/settings_rows" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="5dp" android:clipChildren="false" />
     </ScrollView>
 </LinearLayout>

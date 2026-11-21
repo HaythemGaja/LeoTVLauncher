@@ -1,56 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/bg"
-    android:gravity="center_horizontal"
-    android:padding="28dp">
-
-    <TextView
-        android:id="@+id/pin_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="Press 4 arrows for your PIN"
-        android:textSize="28sp"
-        android:textStyle="bold"
-        android:textColor="@color/text" />
-
-    <TextView
-        android:id="@+id/pin_dots"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="28dp"
-        android:text="○ ○ ○ ○"
-        android:textSize="44sp"
-        android:textColor="@color/accent"
-        android:letterSpacing="0.2" />
-
-    <TextView
-        android:id="@+id/pin_error"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:minHeight="30dp"
-        android:text=""
-        android:textSize="18sp"
-        android:textColor="@color/error" />
-
-    <GridLayout
-        android:id="@+id/pin_grid"
-        android:layout_width="420dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:columnCount="3"
-        android:orientation="horizontal" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:gravity="center"
-        android:text="Press the arrow keys on your remote — the screen only shows dots\nBack deletes one arrow"
-        android:textSize="16sp"
-        android:textColor="@color/text2" />
-</LinearLayout>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:padding="24dp">
+  <ScrollView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:fillViewport="false">
+    <LinearLayout android:id="@+id/pin_panel" android:orientation="vertical" android:layout_width="480dp" android:layout_height="wrap_content" android:layout_gravity="center_horizontal" android:gravity="center_horizontal" android:padding="22dp">
+      <ImageView android:id="@+id/pin_mark" android:layout_width="32dp" android:layout_height="32dp" android:importantForAccessibility="no" />
+      <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/pin_brand" android:textSize="12sp" android:letterSpacing="0.12" android:layout_marginTop="10dp" />
+      <TextView android:id="@+id/pin_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:layout_marginTop="10dp" android:text="@string/pin_title" android:textSize="25sp" />
+      <TextView android:id="@+id/pin_dots" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="○ ○ ○ ○" android:textSize="36sp" android:letterSpacing="0.2" android:accessibilityLiveRegion="polite" />
+      <TextView android:id="@+id/pin_error" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:layout_marginTop="8dp" android:minHeight="24dp" android:textSize="16sp" android:accessibilityLiveRegion="assertive" />
+      <GridLayout android:id="@+id/pin_grid" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:columnCount="5" />
+      <TextView android:id="@+id/pin_help" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:gravity="center" android:text="@string/pin_help" android:textSize="15sp" />
+    </LinearLayout>
+  </ScrollView>
+</FrameLayout>

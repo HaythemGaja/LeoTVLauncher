@@ -2,10 +2,8 @@ package com.leo.tvlauncher;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.Button;
@@ -14,13 +12,12 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 /**
- * Arrow PIN pad. The PIN is a sequence of 4 arrow-key presses on the remote
- * (up / down / left / right), so nobody watching the screen can read it.
- * Progress dots never reveal which arrows were pressed.
- * Back deletes one arrow (or exits when empty).
+ * Arrow PIN pad. The PIN is a sequence of 4 arrow-key presses on the remote (up / down / left /
+ * right), so nobody watching the screen can read it. Progress dots never reveal which arrows were
+ * pressed. Back deletes one arrow (or exits when empty).
  *
- * Modes: SET -> CONFIRM, UNLOCK (open a locked app), VERIFY (enter App Lock),
- * folder SET/CONFIRM/UNLOCK, VERIFY_EXIT_KIDS.
+ * <p>Modes: SET -> CONFIRM, UNLOCK (open a locked app), VERIFY (enter App Lock), folder
+ * SET/CONFIRM/UNLOCK, VERIFY_EXIT_KIDS.
  */
 public class PinActivity extends Activity {
 
@@ -60,8 +57,8 @@ public class PinActivity extends Activity {
         if (PinStore.needsMigration(this)) {
             boolean folderMode = (mode == MODE_UNLOCK_FOLDER);
             PinStore.migrate(this);
-            Toast.makeText(this, "PINs are now arrow presses — set a new one",
-                    Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "PINs are now arrow presses — set a new one", Toast.LENGTH_LONG)
+                    .show();
             if (folderMode) {
                 finish();
                 return;
@@ -73,8 +70,23 @@ public class PinActivity extends Activity {
         dotsView = findViewById(R.id.pin_dots);
         errorView = findViewById(R.id.pin_error);
 
-        Theme t = Theme.applyBase(this, titleView);
+        Theme t = Theme.current(this);
+        View panel = findViewById(R.id.pin_panel);
+        Theme.styleTree(panel, t);
+        panel.setBackground(Theme.surface(this, t.card, t.cardFocus, 1));
+        android.view.ViewGroup.LayoutParams panelLp = panel.getLayoutParams();
+        panelLp.width =
+                Math.min(
+                        Theme.dp(this, 520),
+                        getResources().getDisplayMetrics().widthPixels - Theme.dp(this, 48));
+        panel.setLayoutParams(panelLp);
+        titleView.setTextColor(t.text);
+        titleView.setTextSize(24);
         dotsView.setTextColor(t.accent);
+        errorView.setTextColor("light".equals(t.id) ? 0xFFB3261E : 0xFFFF7272);
+        ((TextView) findViewById(R.id.pin_help)).setTextColor(t.text2);
+        ((android.widget.ImageView) findViewById(R.id.pin_mark))
+                .setImageDrawable(new LeoIcon(LeoIcon.LOCK, t.accent));
 
         updateTitle();
         buildArrows();
@@ -87,10 +99,18 @@ public class PinActivity extends Activity {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             String d = null;
             switch (event.getKeyCode()) {
-                case KeyEvent.KEYCODE_DPAD_UP: d = "U"; break;
-                case KeyEvent.KEYCODE_DPAD_DOWN: d = "D"; break;
-                case KeyEvent.KEYCODE_DPAD_LEFT: d = "L"; break;
-                case KeyEvent.KEYCODE_DPAD_RIGHT: d = "R"; break;
+                case KeyEvent.KEYCODE_DPAD_UP:
+                    d = "U";
+                    break;
+                case KeyEvent.KEYCODE_DPAD_DOWN:
+                    d = "D";
+                    break;
+                case KeyEvent.KEYCODE_DPAD_LEFT:
+                    d = "L";
+                    break;
+                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                    d = "R";
+                    break;
                 case KeyEvent.KEYCODE_BACK:
                     if (pin.length() > 0) {
                         deleteOne();
@@ -109,55 +129,74 @@ public class PinActivity extends Activity {
 
     private void updateTitle() {
         switch (mode) {
-            case MODE_SET: titleView.setText("Press 4 arrows for your PIN"); break;
-            case MODE_CONFIRM: titleView.setText("Repeat the 4 arrows"); break;
-            case MODE_UNLOCK: titleView.setText("Enter arrow PIN to open app"); break;
-            case MODE_VERIFY: titleView.setText("Enter your arrow PIN"); break;
-            case MODE_SET_FOLDER: titleView.setText("Press 4 arrows for the folder PIN"); break;
-            case MODE_CONFIRM_FOLDER: titleView.setText("Repeat the folder arrows"); break;
-            case MODE_UNLOCK_FOLDER: titleView.setText("Enter folder arrow PIN"); break;
-            case MODE_VERIFY_EXIT_KIDS: titleView.setText("Enter arrow PIN to exit kids mode"); break;
-            case MODE_VERIFY_SETTINGS: titleView.setText("Enter arrow PIN to open settings"); break;
+            case MODE_SET:
+                titleView.setText("Press 4 arrows for your PIN");
+                break;
+            case MODE_CONFIRM:
+                titleView.setText("Repeat the 4 arrows");
+                break;
+            case MODE_UNLOCK:
+                titleView.setText("Enter arrow PIN to open app");
+                break;
+            case MODE_VERIFY:
+                titleView.setText("Enter your arrow PIN");
+                break;
+            case MODE_SET_FOLDER:
+                titleView.setText("Press 4 arrows for the folder PIN");
+                break;
+            case MODE_CONFIRM_FOLDER:
+                titleView.setText("Repeat the folder arrows");
+                break;
+            case MODE_UNLOCK_FOLDER:
+                titleView.setText("Enter folder arrow PIN");
+                break;
+            case MODE_VERIFY_EXIT_KIDS:
+                titleView.setText("Enter arrow PIN to exit kids mode");
+                break;
+            case MODE_VERIFY_SETTINGS:
+                titleView.setText("Enter arrow PIN to open settings");
+                break;
         }
     }
 
-    /** 3x3 cross of arrow buttons (visual + touch input; remotes use dispatchKeyEvent). */
+    /** Touch remains available; physical remote arrows still enter the same four-arrow PIN. */
     private void buildArrows() {
-        GridLayout g = findViewById(R.id.pin_grid);
-        g.removeAllViews();
-        String[][] cells = {
-                {null, "▲|U", null},
-                {"◀|L", "⌫|DEL", "▶|R"},
-                {null, "▼|D", null},
+        GridLayout grid = findViewById(R.id.pin_grid);
+        grid.removeAllViews();
+        grid.setColumnCount(5);
+        String[][] keys = {
+            {"↑", "U", "Up"},
+            {"↓", "D", "Down"},
+            {"←", "L", "Left"},
+            {"→", "R", "Right"},
+            {"⌫", "DEL", "Delete"}
         };
-        for (int r = 0; r < 3; r++) {
-            for (int c = 0; c < 3; c++) {
-                if (cells[r][c] == null) continue;
-                String[] parts = cells[r][c].split("\\|");
-                final String action = parts[1];
-                Button b = new Button(this);
-                b.setText(parts[0]);
-                b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 34);
-                b.setTextColor(Color.WHITE);
-                b.setBackgroundResource(R.drawable.pin_btn);
-                b.setFocusable(false);
-                b.setClickable(true);
-                GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-                lp.width = 0;
-                lp.height = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 84,
-                        getResources().getDisplayMetrics());
-                lp.rowSpec = GridLayout.spec(r);
-                lp.columnSpec = GridLayout.spec(c, 1f);
-                lp.setMargins(10, 10, 10, 10);
-                b.setLayoutParams(lp);
-                b.setOnClickListener(new View.OnClickListener() {
-                    @Override public void onClick(View v) {
-                        if ("DEL".equals(action)) deleteOne();
-                        else onDirection(action);
-                    }
-                });
-                g.addView(b);
-            }
+        Theme t = Theme.current(this);
+        for (int i = 0; i < keys.length; i++) {
+            final String action = keys[i][1];
+            Button button = new Button(this);
+            button.setText(keys[i][0]);
+            button.setContentDescription(keys[i][2]);
+            button.setTextSize(25);
+            button.setTextColor(t.text);
+            button.setBackground(Theme.tileBackground(this, t));
+            button.setFocusable(false);
+            button.setClickable(true);
+            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+            lp.width = 0;
+            lp.height = Theme.dp(this, 52);
+            lp.columnSpec = GridLayout.spec(i, 1f);
+            lp.setMargins(
+                    Theme.dp(this, 4), Theme.dp(this, 4), Theme.dp(this, 4), Theme.dp(this, 4));
+            grid.addView(button, lp);
+            button.setOnClickListener(
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            if ("DEL".equals(action)) deleteOne();
+                            else onDirection(action);
+                        }
+                    });
         }
     }
 
@@ -166,9 +205,14 @@ public class PinActivity extends Activity {
         if (pin.length() < PIN_LEN) pin.append(d);
         updateDots();
         if (pin.length() == PIN_LEN) {
-            handler.postDelayed(new Runnable() {
-                @Override public void run() { submit(); }
-            }, 220);
+            handler.postDelayed(
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            submit();
+                        }
+                    },
+                    220);
         }
     }
 
@@ -215,6 +259,8 @@ public class PinActivity extends Activity {
                 if (PinStore.checkPin(this, entered)) {
                     HomePrefs.setLastUnlock(this, System.currentTimeMillis());
                     Intent launch = getPackageManager().getLaunchIntentForPackage(targetPkg);
+                    if (launch == null)
+                        launch = getPackageManager().getLeanbackLaunchIntentForPackage(targetPkg);
                     finish();
                     if (launch != null) {
                         startActivity(launch);

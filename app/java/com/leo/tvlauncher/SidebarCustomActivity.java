@@ -1,6 +1,5 @@
 package com.leo.tvlauncher;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.os.Bundle;
@@ -91,13 +90,19 @@ public class SidebarCustomActivity extends BaseSidebarActivity {
         items.add(isHidden ? "Show" : "Hide");
         if (index > 0) items.add("Move up");
         if (index < count - 1) items.add("Move down");
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle(nameOf(id))
-                .setItems(items.toArray(new String[0]),
+                .setItems(
+                        items.toArray(new String[0]),
                         new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int which) {
-                                String item = ((AlertDialog) d).getListView()
-                                        .getAdapter().getItem(which).toString();
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                String item =
+                                        ((AlertDialog) d)
+                                                .getListView()
+                                                .getAdapter()
+                                                .getItem(which)
+                                                .toString();
                                 if ("Show".equals(item)) {
                                     HomePrefs.setSidebarHidden(
                                             SidebarCustomActivity.this, id, false);
@@ -105,8 +110,10 @@ public class SidebarCustomActivity extends BaseSidebarActivity {
                                     HomePrefs.setSidebarHidden(
                                             SidebarCustomActivity.this, id, true);
                                 } else {
-                                    List<String> order = new ArrayList<>(
-                                            HomePrefs.sidebarOrder(SidebarCustomActivity.this));
+                                    List<String> order =
+                                            new ArrayList<>(
+                                                    HomePrefs.sidebarOrder(
+                                                            SidebarCustomActivity.this));
                                     int i = order.indexOf(id);
                                     int j = "Move up".equals(item) ? i - 1 : i + 1;
                                     if (i >= 0 && j >= 0 && j < order.size()) {

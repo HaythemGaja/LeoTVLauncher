@@ -1,7 +1,6 @@
 package com.leo.tvlauncher;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
@@ -100,19 +99,23 @@ public class LockActivity extends Activity {
     }
 
     private void confirmRemovePin() {
-        new AlertDialog.Builder(this)
+        Theme.dialog(this)
                 .setTitle("Remove PIN?")
                 .setMessage("All app locks will be turned off.")
-                .setPositiveButton("Remove", new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        PinStore.clearPin(LockActivity.this);
-                        for (String pkg : PinStore.lockedApps(LockActivity.this)) {
-                            PinStore.setLocked(LockActivity.this, pkg, false);
-                        }
-                        Toast.makeText(LockActivity.this, "PIN removed", Toast.LENGTH_SHORT).show();
-                        finish();
-                    }
-                })
+                .setPositiveButton(
+                        "Remove",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                PinStore.clearPin(LockActivity.this);
+                                for (String pkg : PinStore.lockedApps(LockActivity.this)) {
+                                    PinStore.setLocked(LockActivity.this, pkg, false);
+                                }
+                                Toast.makeText(LockActivity.this, "PIN removed", Toast.LENGTH_SHORT)
+                                        .show();
+                                finish();
+                            }
+                        })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
