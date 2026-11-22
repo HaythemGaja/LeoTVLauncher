@@ -23,6 +23,16 @@ public final class TileMetrics {
         return count > 0 && count <= 8 && iconDp >= 32 ? Math.min(4, fitting) : fitting;
     }
 
+    public static int heroColumns(int availablePx, float density) {
+        if (density <= 0) density = 1;
+        return Math.max(1, Math.min(3, availablePx / Math.max(1, Math.round(208 * density))));
+    }
+
+    public static int shelfColumns(int availablePx, float density) {
+        if (density <= 0) density = 1;
+        return Math.max(1, Math.min(4, availablePx / Math.max(1, Math.round(156 * density))));
+    }
+
     public static int width(int availablePx, int columns, int gutterPx) {
         return Math.max(1, availablePx / Math.max(1, columns) - 2 * gutterPx);
     }

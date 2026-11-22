@@ -42,6 +42,11 @@ public class HomeActivity extends Activity {
     public static final String EXTRA_ACTION = "extra_action";
 
     private GridLayout grid;
+    private LinearLayout favoritesRow;
+    private HorizontalScrollView favoritesScroller;
+    private TextView favoritesHeader;
+    private TextView libraryHeader;
+    private int heroColumns = 3;
     private ImageView wallpaperView;
     private TextView hintView;
     private TextView emptyView;
@@ -79,6 +84,10 @@ public class HomeActivity extends Activity {
         setContentView(R.layout.activity_home);
         root = findViewById(R.id.home_root);
         grid = findViewById(R.id.app_grid);
+        favoritesRow = findViewById(R.id.favorites_row);
+        favoritesScroller = findViewById(R.id.favorites_scroller);
+        favoritesHeader = findViewById(R.id.favorites_header);
+        libraryHeader = findViewById(R.id.library_header);
         sidebarBox = findViewById(R.id.sidebar);
         wallpaperView = findViewById(R.id.home_wallpaper);
         hintView = findViewById(R.id.home_hint);
@@ -97,6 +106,7 @@ public class HomeActivity extends Activity {
                         if (width > 1 && width != measuredGridWidth) {
                             measuredGridWidth = width;
                             buildGrid();
+                            buildRecentRow();
                         }
                     }
                 });
@@ -141,8 +151,10 @@ public class HomeActivity extends Activity {
                 new Runnable() {
                     @Override
                     public void run() {
-                        if (grid.getChildCount() > 0 && getCurrentFocus() == null) {
-                            grid.getChildAt(0).requestFocus();
+                        if (getCurrentFocus() == null) {
+                            if (favoritesRow.getChildCount() > 0)
+                                favoritesRow.getChildAt(0).requestFocus();
+                            else if (grid.getChildCount() > 0) grid.getChildAt(0).requestFocus();
                         }
                     }
                 });
@@ -153,16 +165,17 @@ public class HomeActivity extends Activity {
         if (oldFocus != null && oldFocus.getTag() instanceof String)
             lastFocusedTag = (String) oldFocus.getTag();
         theme = Theme.current(this);
-        root.setBackground(Glass.wallpaper(theme));
+        root.setBackgroundColor(theme.bg);
         boolean kids = HomePrefs.kidsMode(this);
-        recentHeader.setTextColor(theme.text2);
-        recentHeader.setText("RECENT");
-        recentHeader.setTextSize(13);
-        recentHeader.setLetterSpacing(.12f);
-        recentScroller.setBackground(Glass.panel(this, theme));
-        recentScroller.setElevation(Theme.dp(this, 6));
-        recentScroller.setPadding(
-                Theme.dp(this, 10), Theme.dp(this, 6), Theme.dp(this, 10), Theme.dp(this, 2));
+        recentHeader.setTextColor(theme.text);
+        recentHeader.setText("Pick up where you left off");
+        recentHeader.setTextSize(19);
+        recentHeader.setLetterSpacing(0);
+        recentScroller.setBackground(null);
+        recentScroller.setElevation(0);
+        recentScroller.setPadding(0, 0, 0, 0);
+        favoritesHeader.setTextColor(theme.text);
+        libraryHeader.setTextColor(theme.text);
         hintView.setTextColor(theme.text2);
         emptyView.setTextColor(theme.text2);
         hintView.setText(
@@ -232,8 +245,8 @@ public class HomeActivity extends Activity {
             int dir = 0;
             if (kc == KeyEvent.KEYCODE_DPAD_LEFT) dir = -1;
             else if (kc == KeyEvent.KEYCODE_DPAD_RIGHT) dir = 1;
-            else if (kc == KeyEvent.KEYCODE_DPAD_UP) dir = -gridCols;
-            else if (kc == KeyEvent.KEYCODE_DPAD_DOWN) dir = gridCols;
+            else if (kc == KeyEvent.KEYCODE_DPAD_UP) dir = -moveColumns();
+            else if (kc == KeyEvent.KEYCODE_DPAD_DOWN) dir = moveColumns();
             else if (kc == KeyEvent.KEYCODE_DPAD_CENTER
                     || kc == KeyEvent.KEYCODE_ENTER
                     || kc == KeyEvent.KEYCODE_BUTTON_A) {
@@ -264,7 +277,10 @@ public class HomeActivity extends Activity {
                     new Runnable() {
                         @Override
                         public void run() {
-                            if (idx < grid.getChildCount()) grid.getChildAt(idx).requestFocus();
+                            if (favoritesRow.getChildCount() > 0)
+                                favoritesRow.getChildAt(0).requestFocus();
+                            else if (idx < grid.getChildCount())
+                                grid.getChildAt(idx).requestFocus();
                         }
                     });
         }
@@ -360,6 +376,10 @@ public class HomeActivity extends Activity {
                         ? (String) focused.getTag()
                         : lastFocusedTag;
         grid.removeAllViews();
+        favoritesRow.removeAllViews();
+        favoritesScroller.setVisibility(View.GONE);
+        favoritesHeader.setVisibility(View.GONE);
+        libraryHeader.setVisibility(View.GONE);
         favTileIndices.clear();
         if (AppTiles.available(grid) <= 1) return; // Wait for the actual post-sidebar measurement.
         int cols = AppTiles.columns(this, grid);
@@ -367,6 +387,7 @@ public class HomeActivity extends Activity {
         gridCols = cols;
 
         List<AppEntry> tiles = new ArrayList<>();
+        List<AppEntry> favorites = new ArrayList<>();
         Set<String> hidden = HomePrefs.hidden(this);
         Map<String, AppEntry> byPkg = new HashMap<>();
         for (AppEntry e : catalog.values()) {
@@ -410,8 +431,8 @@ public class HomeActivity extends Activity {
                 AppEntry e = byPkg.get(pkg);
                 if (e != null && !hidden.contains(pkg) && FolderStore.folderOf(this, pkg) == null) {
                     e.favorite = true;
-                    favTileIndices.add(tiles.size());
-                    tiles.add(e);
+                    favTileIndices.add(favorites.size());
+                    favorites.add(e);
                 }
             }
 
@@ -445,6 +466,18 @@ public class HomeActivity extends Activity {
             }
         }
 
+        boolean home = !kids && currentView == Sidebar.VIEW_HOME;
+        if (home && !favorites.isEmpty()) {
+            int available = AppTiles.available(grid);
+            heroColumns =
+                    TileMetrics.heroColumns(available, getResources().getDisplayMetrics().density);
+            int width = TileMetrics.width(available, heroColumns, Theme.dp(this, 8));
+            for (AppEntry entry : favorites) favoritesRow.addView(makeHeroTile(entry, width));
+            favoritesScroller.setVisibility(View.VISIBLE);
+            favoritesHeader.setVisibility(View.VISIBLE);
+        }
+        libraryHeader.setVisibility(home && !tiles.isEmpty() ? View.VISIBLE : View.GONE);
+
         gridCols =
                 TileMetrics.homeColumns(
                         AppTiles.available(grid),
@@ -468,7 +501,7 @@ public class HomeActivity extends Activity {
         title.setTextSize(32);
         title.setTypeface(android.graphics.Typeface.create("sans-serif-medium", 0));
 
-        if (tiles.isEmpty()) {
+        if (tiles.isEmpty() && favorites.isEmpty()) {
             emptyView.setVisibility(View.VISIBLE);
             if (kids) {
                 emptyView.setText(
@@ -534,6 +567,31 @@ public class HomeActivity extends Activity {
         return v;
     }
 
+    private int moveColumns() {
+        return currentView == Sidebar.VIEW_HOME
+                        && movingPkg != null
+                        && HomePrefs.isFav(this, movingPkg)
+                ? heroColumns
+                : gridCols;
+    }
+
+    private View makeHeroTile(final AppEntry entry, int width) {
+        View view = AppTiles.create(this, entry, width, catalog, true);
+        view.setTag(tileTag(entry));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(width, -2);
+        lp.setMargins(Theme.dp(this, 8), Theme.dp(this, 8), Theme.dp(this, 8), Theme.dp(this, 12));
+        view.setLayoutParams(lp);
+        if (entry.pkg != null && entry.pkg.equals(movingPkg))
+            view.setBackground(Theme.movingTileBackground(this, theme));
+        view.setOnClickListener(
+                v -> {
+                    lastFocusedTag = tileTag(entry);
+                    handleTileClick(entry);
+                });
+        view.setOnLongClickListener(v -> onTileLongPress(entry));
+        return view;
+    }
+
     private void buildRecentRow() {
         recentRow.removeAllViews();
         // The recent strip only appears on the Home view; the Recent view
@@ -558,8 +616,11 @@ public class HomeActivity extends Activity {
     }
 
     private View makeRecentTile(final AppEntry e) {
-        int width = Theme.dp(this, 136);
-        View v = AppTiles.create(this, e, width, catalog);
+        int available = AppTiles.available(grid);
+        int columns =
+                TileMetrics.shelfColumns(available, getResources().getDisplayMetrics().density);
+        int width = TileMetrics.width(available, columns, Theme.dp(this, 8));
+        View v = AppTiles.create(this, e, width, catalog, true);
         v.setTag("recent:" + e.pkg);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(width, -2);
         lp.setMargins(Theme.dp(this, 8), Theme.dp(this, 8), Theme.dp(this, 8), Theme.dp(this, 12));
@@ -929,12 +990,9 @@ public class HomeActivity extends Activity {
                 new Runnable() {
                     @Override
                     public void run() {
-                        for (int i = 0; i < grid.getChildCount(); i++) {
-                            if (tag.equals(grid.getChildAt(i).getTag())) {
-                                grid.getChildAt(i).requestFocus();
-                                return;
-                            }
-                        }
+                        View candidate = favoritesRow.findViewWithTag(tag);
+                        if (candidate == null) candidate = grid.findViewWithTag(tag);
+                        if (candidate != null) candidate.requestFocus();
                     }
                 });
     }

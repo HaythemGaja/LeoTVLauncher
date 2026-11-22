@@ -5,5 +5,6 @@ if [[ -n "${JAVA_HOME:-}" ]]; then export PATH="$JAVA_HOME/bin:$PATH"; fi
 if ! command -v javac && [[ -x ../jdk/bin/javac ]]; then export PATH="$PWD/../jdk/bin:$PATH"; fi
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-javac -d "$work" app/java/com/leo/tvlauncher/TileMetrics.java tests/TileMetricsTest.java
+javac -d "$work" app/java/com/leo/tvlauncher/TileMetrics.java tests/TileMetricsTest.java app/java/com/leo/tvlauncher/BrandTint.java tests/BrandTintTest.java
 java -cp "$work" TileMetricsTest
+java -cp "$work" BrandTintTest

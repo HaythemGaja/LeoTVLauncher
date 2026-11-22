@@ -41,6 +41,15 @@ public final class AppTiles {
     }
 
     public static View create(Context c, AppEntry entry, int width, Map<String, AppEntry> catalog) {
+        return create(c, entry, width, catalog, false);
+    }
+
+    public static View create(
+            Context c,
+            AppEntry entry,
+            int width,
+            Map<String, AppEntry> catalog,
+            boolean artworkLed) {
         Theme t = Theme.current(c);
         LinearLayout tile = new LinearLayout(c);
         tile.setOrientation(LinearLayout.VERTICAL);
@@ -57,40 +66,44 @@ public final class AppTiles {
         LinearLayout.LayoutParams artLp =
                 new LinearLayout.LayoutParams(-1, Math.max(1, artWidth * 9 / 16));
         artwork.setLayoutParams(artLp);
-        GradientDrawable bg = Theme.surface(c, t.card, 0, 0);
-        artwork.setBackground(entry.banner == null ? Glass.panel(c, t) : bg);
+        GradientDrawable bg =
+                Theme.surface(c, entry.folderId != null ? 0xFF202A32 : tint(entry), 0, 0);
+        bg.setCornerRadius(Theme.dp(c, 12));
+        artwork.setBackground(bg);
         artwork.setElevation(Theme.dp(c, 3));
         artwork.setClipToOutline(true);
         artwork.setDuplicateParentStateEnabled(true);
         android.graphics.drawable.StateListDrawable outline =
                 new android.graphics.drawable.StateListDrawable();
-        outline.addState(
-                new int[] {android.R.attr.state_focused}, Theme.surface(c, 0, t.accent, 1));
-        outline.addState(
-                new int[] {android.R.attr.state_pressed}, Theme.surface(c, 0x18000000, 0, 0));
-        outline.addState(new int[] {}, Theme.surface(c, 0, 0, 0));
+        outline.addState(new int[] {android.R.attr.state_focused}, artSurface(c, 0, t.accent));
+        outline.addState(new int[] {android.R.attr.state_pressed}, artSurface(c, 0x18000000, 0));
+        outline.addState(new int[] {}, artSurface(c, 0, 0));
         artwork.setForeground(outline);
         tile.addView(artwork);
         if (entry.folderId != null) {
             bindFolder(c, artwork, entry, catalog, t);
         } else {
-            ImageView image = new ImageView(c);
-            FrameLayout.LayoutParams imageLp;
             if (entry.banner != null) {
-                imageLp = new FrameLayout.LayoutParams(-1, -1);
-                image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                ImageView image = new ImageView(c);
+                image.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 image.setImageDrawable(entry.banner);
+                artwork.addView(image, new FrameLayout.LayoutParams(-1, -1));
+            } else if (artworkLed) {
+                bindBrand(c, artwork, entry, artWidth, artLp.height);
             } else {
+                ImageView image = new ImageView(c);
                 int size =
-                        Math.min(Theme.dp(c, Theme.iconSizeDp(c)), artLp.height - Theme.dp(c, 16));
-                size = Math.max(Theme.dp(c, 24), size);
-                imageLp = new FrameLayout.LayoutParams(size, size, Gravity.CENTER);
+                        Math.max(
+                                Theme.dp(c, 24),
+                                Math.min(
+                                        Theme.dp(c, Theme.iconSizeDp(c)),
+                                        artLp.height - Theme.dp(c, 16)));
                 image.setScaleType(ImageView.ScaleType.FIT_CENTER);
                 if (entry.icon != null)
                     image.setImageBitmap(Theme.shapedIcon(entry.icon, size, Theme.iconShape(c)));
                 else image.setImageResource(R.drawable.ic_launcher);
+                artwork.addView(image, new FrameLayout.LayoutParams(size, size, Gravity.CENTER));
             }
-            artwork.addView(image, imageLp);
         }
         LinearLayout badges = new LinearLayout(c);
         badges.setOrientation(LinearLayout.HORIZONTAL);
@@ -115,12 +128,16 @@ public final class AppTiles {
         }
         label.setTextColor(t.text);
         label.setTextSize(Theme.labelSizeSp(c));
-        label.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        label.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         label.setMaxLines(2);
+        label.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE);
+        label.setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE);
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
         label.setPadding(Theme.dp(c, 2), Theme.dp(c, 8), Theme.dp(c, 2), 0);
         // Reserve two scaled text lines so larger labels do not collide with the next row.
-        label.setMinHeight((int) Math.ceil(label.getTextSize() * 2.35f) + Theme.dp(c, 8));
+        label.setMinHeight(
+                (int) Math.ceil(label.getTextSize() * (artworkLed ? 1.35f : 2.35f))
+                        + Theme.dp(c, 8));
         label.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         tile.addView(label, new LinearLayout.LayoutParams(-1, -2));
         tile.setContentDescription(
@@ -129,6 +146,68 @@ public final class AppTiles {
                         + (entry.favorite ? ", favorite" : "")
                         + (entry.folderId != null ? ", folder" : ""));
         return tile;
+    }
+
+    private static GradientDrawable artSurface(Context c, int fill, int stroke) {
+        GradientDrawable drawable = Theme.surface(c, fill, stroke, stroke == 0 ? 0 : 1);
+        drawable.setCornerRadius(Theme.dp(c, 12));
+        return drawable;
+    }
+
+    private static int tint(AppEntry entry) {
+        if (entry.brandTint != null) return entry.brandTint;
+        int color = 0xFF252B32;
+        if (entry.icon != null) {
+            android.graphics.Bitmap sample =
+                    android.graphics.Bitmap.createBitmap(
+                            24, 24, android.graphics.Bitmap.Config.ARGB_8888);
+            android.graphics.Rect bounds = new android.graphics.Rect(entry.icon.getBounds());
+            try {
+                entry.icon.setBounds(0, 0, 24, 24);
+                entry.icon.draw(new android.graphics.Canvas(sample));
+                int[] pixels = new int[24 * 24];
+                sample.getPixels(pixels, 0, 24, 0, 0, 24, 24);
+                color = BrandTint.fromPixels(pixels);
+            } catch (RuntimeException unavailableIcon) {
+                color = 0xFF252B32;
+            } finally {
+                entry.icon.setBounds(bounds);
+                sample.recycle();
+            }
+        }
+        entry.brandTint = color;
+        return color;
+    }
+
+    private static void bindBrand(
+            Context c, FrameLayout artwork, AppEntry entry, int width, int height) {
+        LinearLayout mark = new LinearLayout(c);
+        mark.setGravity(Gravity.CENTER);
+        int inset = Theme.dp(c, 18);
+        FrameLayout.LayoutParams markLp =
+                new FrameLayout.LayoutParams(Math.max(1, width - inset * 2), -1, Gravity.CENTER);
+        artwork.addView(mark, markLp);
+        if (entry.icon != null) {
+            ImageView logo = new ImageView(c);
+            logo.setImageDrawable(entry.icon);
+            logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            // Optical logo size follows the art stage, not the tiny library-icon preference.
+            int logoSize = Math.max(Theme.dp(c, 32), Math.min(height * 3 / 5, width / 4));
+            LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(logoSize, logoSize);
+            logoLp.setMarginEnd(Theme.dp(c, 10));
+            mark.addView(logo, logoLp);
+        }
+        TextView wordmark = new TextView(c);
+        wordmark.setText(HomePrefs.displayLabel(c, entry));
+        wordmark.setTextColor(0xFFF7F8FA);
+        wordmark.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        wordmark.setTextSize(width >= Theme.dp(c, 210) ? 20 : 18);
+        wordmark.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE);
+        wordmark.setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE);
+        wordmark.setMaxLines(2);
+        wordmark.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        mark.addView(wordmark, new LinearLayout.LayoutParams(0, -2, 1));
+        mark.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
     }
 
     private static boolean folderLocked(Context c, String id) {

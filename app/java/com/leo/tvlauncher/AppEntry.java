@@ -9,6 +9,8 @@ public class AppEntry {
     public Drawable icon;
     public Drawable banner; // activity banner, then application banner when available
 
+    Integer brandTint; // cached once per current app catalog, never persisted
+
     public String folderId = null; // set for folder tiles
     public boolean favorite = false; // shown with a star on home
 
