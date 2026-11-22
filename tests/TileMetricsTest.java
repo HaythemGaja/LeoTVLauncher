@@ -43,6 +43,19 @@ public final class TileMetricsTest {
         check(TileMetrics.homeColumns(704, 1, 24, 5) == 5, "explicit Tiny can fit five apps");
         check(TileMetrics.homeColumns(400, 1, 72, 5) == 2, "four-column target never squeezes narrow screens");
         check(TileMetrics.homeColumns(1024, 1, 72, 30) == 5, "large libraries retain width-driven density");
+        check(TileMetrics.heroColumns(704,1)==3, "three hero cards at normal TV width");
+        check(TileMetrics.shelfColumns(704,1)==4, "four smaller Recent cards");
+        check(TileMetrics.heroColumns(440,1)==2, "hero narrows to two");
+        check(TileMetrics.heroColumns(200,1)==1, "hero narrows to one");
+        for(float d : new float[] {.75f,1f,1.33125f,2f}) {
+            int available=Math.round(704*d);
+            int columns=TileMetrics.heroColumns(available,d);
+            int recent=TileMetrics.shelfColumns(available,d);
+            int margin=Math.round(8*d);
+            check((TileMetrics.width(available,columns,margin)+margin*2)*columns<=available,"hero fits measured width");
+            check((TileMetrics.width(available,recent,margin)+margin*2)*recent<=available,"Recent fits measured width");
+            check(TileMetrics.width(available,columns,margin)>TileMetrics.width(available,recent,margin),"hero larger than Recent");
+        }
         System.out.println("TileMetrics: " + assertions + " assertions passed");
     }
 }

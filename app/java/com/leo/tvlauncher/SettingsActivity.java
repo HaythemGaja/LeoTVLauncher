@@ -156,10 +156,7 @@ public class SettingsActivity extends BaseSidebarActivity {
                     minutes == 0 ? "Always ask for PIN" : "After " + minutes + " minutes",
                     "chooserelock");
         } else if ("System".equals(category)) {
-            addSummary(
-                    "Visual build",
-                    "Glass home preview 1 · smaller 24 / 32 dp options",
-                    "visualbuild");
+            addSummary("Visual build", "Artwork home preview 2 · Favorites first", "visualbuild");
             addSummary(
                     "Default Home app",
                     isDefaultHome()
@@ -420,12 +417,12 @@ public class SettingsActivity extends BaseSidebarActivity {
         }
         if ("visualbuild".equals(r.kind)) {
             Theme.dialog(this)
-                    .setTitle("Glass home preview 1")
+                    .setTitle("Artwork home preview 2")
                     .setMessage(
-                            "Native Android Views with layered translucent surfaces, single-surface"
-                                + " app cards and smaller density options. Home glass is a tinted"
-                                + " approximation, not live backdrop blur. Supported Android 12+"
-                                + " dialogs may blur the window behind them. TV visual and remote"
+                            "Design-2 artwork home: a large Favorites row, a smaller Recent shelf,"
+                                + " and apps/folders below. Real banners fill the artwork; missing"
+                                + " banners use an icon-sampled matte with logo and app name. Small"
+                                + " library density settings remain available. TV visual and remote"
                                 + " testing is still required.")
                     .setPositiveButton("OK", null)
                     .show();

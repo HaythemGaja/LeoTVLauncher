@@ -107,7 +107,7 @@ final class Glass {
                 button.setTextSize(17);
             }
         }
-        window.setBackgroundDrawable(panel(c, theme));
+        window.setBackgroundDrawable(Theme.surface(c, theme.card | 0xFF000000, 0, 0));
         window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         window.setDimAmount(.55f);
         if (Build.VERSION.SDK_INT < 31) return;
@@ -116,6 +116,10 @@ final class Glass {
         java.util.function.Consumer<Boolean> listener =
                 enabled -> {
                     WindowManager.LayoutParams params = window.getAttributes();
+                    window.setBackgroundDrawable(
+                            enabled
+                                    ? panel(c, theme)
+                                    : Theme.surface(c, theme.card | 0xFF000000, 0, 0));
                     if (enabled) {
                         window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND);
                         params.setBlurBehindRadius(Theme.dp(c, 16));
